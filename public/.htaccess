@@ -1,0 +1,17 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirigir todas las peticiones a index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Deshabilitar listado de directorios
+Options -Indexes
+
+# Configuración de seguridad
+<FilesMatch "\.(env|md|json)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
