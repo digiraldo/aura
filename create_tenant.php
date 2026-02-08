@@ -86,17 +86,11 @@ $dbUsername = $env['DB_USERNAME'] ?? 'root';
 $dbPassword = $env['DB_PASSWORD'] ?? '';
 
 // Incluir SchemaManager
-if (!file_exists(__DIR__ . '/core/lib/SchemaManager.php')) {
-    die("❌ ERROR: Archivo SchemaManager.php no encontrado en core/lib/\n");
-}
 require_once __DIR__ . '/core/lib/SchemaManager.php';
 
-$schemaManagerClass = 'SchemaManager';
-if (!class_exists($schemaManagerClass)) {
-    $schemaManagerClass = 'Core\\Lib\\SchemaManager';
-    if (!class_exists($schemaManagerClass)) {
-        die("❌ ERROR: Clase SchemaManager no encontrada.\n");
-    }
+// Verificar que la clase existe con el namespace correcto
+if (!class_exists('Aura\\Core\\Database\\SchemaManager')) {
+    die("❌ ERROR: Clase SchemaManager no encontrada.\n   Verifica que el archivo core/lib/SchemaManager.php existe.\n");
 }
 
 try {
@@ -127,8 +121,8 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
     
-    // Instanciar SchemaManager
-    $schemaManager = new $schemaManagerClass($pdoRoot, $pdoMaster);
+    // Instanciar SchemaManager con namespace completo
+    $schemaManager = new Aura\Core\Database\SchemaManager($pdoRoot, $pdoMaster);
     
     echo "🏗️  Creando tenant...\n";
     echo "   (esto puede tardar unos segundos)\n\n";

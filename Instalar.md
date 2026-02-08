@@ -41,11 +41,12 @@ Instalamos el repositorio de **Ondřej Surý** para obtener PHP 8.2 correctament
 ```bash
 sudo apt update
 sudo apt install lsb-release apt-transport-https ca-certificates curl -y
+```
+**Agregar llave y repositorio de PHP**
 
-# Agregar llave y repositorio de PHP
+```bash
 sudo curl -sSLo /usr/share/keyrings/deb.sury.org-php.gpg https://packages.sury.org/php/apt.gpg
 echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/php.list
-
 ```
 
 ### 2. Instalar Nginx y PHP 8.2
@@ -66,16 +67,19 @@ sudo apt install nginx php8.2-fpm php8.2-mysql php8.2-xml php8.2-mbstring php8.2
 cd ~
 git clone https://github.com/digiraldo/aura.git
 cd aura
+```
 
-# Crear directorios necesarios si no existen (por si acaso)
+**Crear directorios necesarios si no existen (por si acaso)**
+```bash
 mkdir -p ~/aura/storage/{logs,cache,uploads,sessions}
 mkdir -p ~/aura/plugins
+```
 
-# Ajustar permisos para el usuario www-data de Nginx
+**Ajustar permisos para el usuario www-data de Nginx**
+```bash
 sudo chown -R di:www-data ~/aura
 sudo chmod -R 775 ~/aura/storage
 sudo chmod -R 775 ~/aura/plugins
-
 ```
 
 ### 2. Configurar Variables de Entorno (.env)
@@ -86,15 +90,6 @@ Configuramos la conexión hacia la IP del servidor donde corre MariaDB en Docker
 cp .env.example .env
 sed -i 's/DB_HOST=localhost/DB_HOST=192.168.68.20/g' .env
 sed -i 's/DB_PASSWORD=/DB_PASSWORD=4dm1n1234/g' .env
-
-```
-
-### 3. Aplicar Parche de "Namespace"
-
-Corregimos el error de la clase `SchemaManager` para que el cargador de PHP la encuentre.
-
-```bash
-sed -i 's/new Aura\\Core\\SchemaManager/new Aura\\Core\\Database\\SchemaManager/g' ~/aura/create_tenant.php
 
 ```
 
@@ -138,7 +133,7 @@ sudo nano /etc/nginx/conf.d/aura.conf
 2. **Pegar esta configuración:**
 ```nginx
 server {
-    listen 80; # Cambiar a 7484 si se desea mantener ese puerto
+    listen 80; # Cambiar a 7474 si se desea mantener ese puerto
     server_name aura.local *.aura.local;
 
     root /home/di/aura/public;
@@ -190,7 +185,6 @@ php create_tenant.php empresa_demo
 ```
 
 
-
 ---
 
 ## Acceso Final
@@ -204,20 +198,3 @@ Para entrar desde tu computadora personal, edita el archivo `hosts` de tu sistem
 
 **URL de acceso:** `http://empresa_demo.aura.local`
 **Credenciales:** `admin` / `admin123`
-
-
-
-1. Limpieza total del entorno
-Primero eliminamos los rastros de instalaciones anteriores, bases de datos y el repositorio de Cloudflare que está bloqueando las actualizaciones.
-
-```bash
-# Eliminar carpeta del proyecto
-rm -rf ~/aura
-
-# Eliminar bases de datos en Docker
-sudo docker exec -it mariadb mariadb -u root -e "DROP DATABASE IF EXISTS aura_master; DROP DATABASE IF EXISTS tenant_empresa; DROP DATABASE IF EXISTS tenant_empresa_demo;"
-
-# Eliminar repositorio bloqueado de Cloudflare y limpiar índices
-sudo rm -f /etc/apt/sources.list.d/cloudflare-client.list
-sudo rm -rf /var/lib/apt/lists/*
-```
