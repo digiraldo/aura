@@ -173,10 +173,33 @@ Ejecutamos los scripts de Aura utilizando el PHP nativo del sistema:
 
 1. **Instalar Base de Datos Master:**
 ```bash
+cd ~/aura
 php install.php
 
 ```
 
+**Salida esperada:**
+```
+╔═══════════════════════════════════════════════╗
+║   AURA PLATFORM - INSTALACIÓN AUTOMÁTICA    ║
+║      El WordPress de la Contabilidad         ║
+╚═══════════════════════════════════════════════╝
+
+📋 Configuración detectada:
+   Host: 192.168.68.20:3306
+   Base de datos: aura_master
+   Usuario: root
+
+🔌 Conectando a MySQL...
+✅ Conexión exitosa.
+
+🗄️  Verificando base de datos master...
+✅ Base de datos 'aura_master' creada.
+
+📊 Creando tabla de tenants...
+✅ Tabla 'tenants' creada.
+...
+```
 
 2. **Crear Tenant de prueba:**
 ```bash
@@ -184,6 +207,55 @@ php create_tenant.php empresa_demo
 
 ```
 
+**Salida esperada:**
+```
+╔═══════════════════════════════════════════════╗
+║      AURA PLATFORM - CREACIÓN DE TENANT      ║
+╚═══════════════════════════════════════════════╝
+
+📋 Información del Tenant:
+   Nombre: empresa_demo
+   Usuario Admin: admin
+   Contraseña: ********
+
+¿Desea continuar? (s/n): s
+
+🔌 Conectando a base de datos master...
+✅ Conectado a aura_master
+
+🏗️  Creando tenant...
+   (esto puede tardar unos segundos)
+
+✅ Tenant creado exitosamente!
+...
+```
+
+### Solución de Problemas Comunes
+
+**Error: "Connection refused"**
+```bash
+# Verificar que MariaDB esté corriendo
+sudo docker ps | grep mariadb
+
+# Verificar conectividad
+telnet 192.168.68.20 3306
+```
+
+**Error: "Access denied for user"**
+```bash
+# Verificar credenciales en .env
+cat .env | grep DB_
+
+# Probar conexión manual
+mysql -h 192.168.68.20 -u root -p
+```
+
+**Error: "Class SchemaManager not found"**
+```bash
+# Asegurarse de tener la última versión
+cd ~/aura
+git pull origin main
+```
 
 ---
 
