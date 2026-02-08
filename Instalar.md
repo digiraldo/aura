@@ -118,7 +118,7 @@ sudo apt install nginx php8.2-fpm php8.2-mysql php8.2-xml php8.2-mbstring php8.2
 ```
 
 ### 6. Instalar phpMyAdmin
-
+**Recuerde seguir los pasos durante la instalación.**
 ```bash
 sudo apt install phpmyadmin -y
 ```
@@ -129,13 +129,66 @@ sudo apt install phpmyadmin -y
 - Password de MySQL para phpmyadmin: `Admin1234`
 - Password de aplicación: `Admin1234`
 
-**Crear enlace simbólico para Nginx:**
+### 7. Configurar phpMyAdmin en Puerto 8998
+
+**Crear configuración dedicada para phpMyAdmin:**
 
 ```bash
-sudo ln -s /usr/share/phpmyadmin /home/di/aura/public/phpmyadmin
+sudo nano /etc/nginx/conf.d/phpmyadmin.conf
+```
 
-# Ajustar permisos
-sudo chown -R www-data:www-data /usr/share/phpmyadmin
+**Pegar esta configuración:**
+
+```nginx
+server {
+    listen 8998;
+    server_name 192.168.68.20 localhost;
+
+    root /usr/share/phpmyadmin;
+    index index.php index.html;
+
+    # Logs específicos para phpMyAdmin
+    access_log /var/log/nginx/phpmyadmin_access.log;
+    error_log /var/log/nginx/phpmyadmin_error.log;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+```
+
+**Guardar:** `Ctrl+O`, `Enter`, `Ctrl+X`
+
+**Verificar y reiniciar Nginx:**
+
+```bash
+# Probar configuración
+sudo nginx -t
+
+# Reiniciar Nginx
+sudo systemctl restart nginx
+
+# Verificar que está escuchando en 8998
+sudo ss -tlnp | grep 8998
+```
+
+**Abrir puerto en firewall:**
+
+```bash
+sudo ufw allow 8998/tcp
+sudo ufw reload
 ```
 
 ---
@@ -530,8 +583,8 @@ ls -la /home/di/aura/storage/
 curl -v http://localhost:7474/
 curl -v http://192.168.68.20:7474/
 
-# Acceder a phpMyAdmin
-curl -v http://localhost:7474/phpmyadmin/
+# Acceder a phpMyAdmin (Puerto 8998)
+curl -v http://localhost:8998/
 ```
 
 #### 📋 Checklist Final
@@ -547,7 +600,8 @@ Antes de pedir ayuda, verifica:
 - [ ] Base de datos accesible: `mysql -u aura_admin -pAdmin1234`
 - [ ] Archivo .env configurado: `cat ~/aura/.env`
 - [ ] Logs de error revisados: `sudo tail -50 /var/log/nginx/aura_error.log`
-- [ ] phpMyAdmin accesible: `http://192.168.68.20:7474/phpmyadmin/`
+- [ ] phpMyAdmin accesible: `http://192.168.68.20:8998/`
+- [ ] Puerto 8998 abierto para phpMyAdmin: `sudo netstat -tlnp | grep 8998`
 
 ---
 
@@ -564,9 +618,9 @@ http://192.168.68.20:7474/
 
 **Credenciales Aura:** `admin` / `admin123`
 
-**Acceder a phpMyAdmin:**
+**Acceder a phpMyAdmin (Puerto 8998):**
 ```
-http://192.168.68.20:7474/phpmyadmin/
+http://192.168.68.20:8998/
 ```
 
 **Credenciales phpMyAdmin:**
