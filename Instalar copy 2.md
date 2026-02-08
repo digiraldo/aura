@@ -1,23 +1,38 @@
-# Guía de Instalación: Aura Platform (Stack Nativo Completo)
+# Guía de Instalación: Aura Platform (Nativo + DB Docker)
 
-Esta guía detalla la instalación de **Aura Platform** en un servidor Debian/Ubuntu utilizando **todo el stack de forma nativa**: Nginx, PHP 8.2, MariaDB y phpMyAdmin.
+Esta guía detalla la instalación de **Aura Platform** en un servidor Debian/Ubuntu utilizando **Nginx y PHP 8.2 de forma nativa**, manteniendo la base de datos **MariaDB en Docker**.
 
-## Fase 1: Limpieza Total (Opcional)
+## Fase 1: Limpieza Total
 
-Si tienes instalaciones previas, puedes limpiarlas:
+Antes de comenzar, eliminamos instalaciones previas y bases de datos para evitar conflictos.
 
+1. **Eliminar archivos del proyecto:**
 ```bash
-# Eliminar archivos del proyecto anterior si existe
 cd ~
 rm -rf ~/aura
 
-# Limpiar bases de datos previas si existen (solo si ya tienes MariaDB instalado)
-mysql -u root -p -e "DROP DATABASE IF EXISTS aura_master; DROP DATABASE IF EXISTS tenant_empresa; DROP DATABASE IF EXISTS tenant_empresa_demo;"
 ```
+
+
+2. **Limpiar base de datos en Docker:**
+```bash
+sudo docker exec -it mariadb mariadb -u root -e "DROP DATABASE IF EXISTS aura_master; DROP DATABASE IF EXISTS tenant_empresa; DROP DATABASE IF EXISTS tenant_empresa_demo;"
+
+```
+
+
+3. **Eliminar repositorios con errores (Cloudflare Key Expired):**
+```bash
+sudo rm -f /etc/apt/sources.list.d/cloudflare-client.list
+sudo rm -rf /var/lib/apt/lists/*
+
+```
+
+
 
 ---
 
-## Fase 2: Instalación del Stack Completo (Nativo)
+## Fase 2: Instalación de Dependencias (Nativo)
 
 ### 1. Preparar Repositorios de PHP (Debian Trixie/Testing)
 
@@ -34,77 +49,12 @@ sudo curl -sSLo /usr/share/keyrings/deb.sury.org-php.gpg https://packages.sury.o
 echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/php.list
 ```
 
-### 2. Instalar MariaDB
-
-```bash
-sudo apt update
-sudo apt install mariadb-server mariadb-client -y
-
-# Iniciar y habilitar MariaDB
-sudo systemctl start mariadb
-sudo systemctl enable mariadb
-
-# Verificar que está corriendo
-sudo systemctl status mariadb
-```
-
-### 3. Configurar Seguridad de MariaDB
-
-```bash
-sudo mysql_secure_installation
-```
-
-**Responde a las preguntas:**
-- Switch to unix_socket authentication? **N**
-- Change the root password? **Y** (usar: `4dm1n1234`)
-- Remove anonymous users? **Y**
-- Disallow root login remotely? **N** (si necesitas acceso remoto)
-- Remove test database? **Y**
-- Reload privilege tables now? **Y**
-
-### 4. Crear Usuario de Base de Datos
-
-```bash
-sudo mysql -u root -p
-```
-
-Dentro de MySQL, ejecuta:
-
-```sql
-CREATE USER 'aura_admin'@'localhost' IDENTIFIED BY '4dm1n1234';
-CREATE USER 'aura_admin'@'%' IDENTIFIED BY '4dm1n1234';
-GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'localhost' WITH GRANT OPTION;
-GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'%' WITH GRANT OPTION;
-FLUSH PRIVILEGES;
-EXIT;
-```
-
-### 5. Instalar Nginx y PHP 8.2
+### 2. Instalar Nginx y PHP 8.2
 
 ```bash
 sudo apt update
 sudo apt install nginx php8.2-fpm php8.2-mysql php8.2-xml php8.2-mbstring php8.2-curl php8.2-zip -y
-```
 
-### 6. Instalar phpMyAdmin
-
-```bash
-sudo apt install phpmyadmin -y
-```
-
-**Durante la instalación:**
-- Servidor web: Selecciona **apache2** (presiona espacio) y luego **Enter** (lo configuraremos para Nginx manualmente)
-- Configurar base de datos con dbconfig-common? **Sí**
-- Password de MySQL para phpmyadmin: `4dm1n1234`
-- Password de aplicación: `4dm1n1234`
-
-**Crear enlace simbólico para Nginx:**
-
-```bash
-sudo ln -s /usr/share/phpmyadmin /home/di/aura/public/phpmyadmin
-
-# Ajustar permisos
-sudo chown -R www-data:www-data /usr/share/phpmyadmin
 ```
 
 ---
@@ -134,13 +84,13 @@ sudo chmod -R 775 ~/aura/plugins
 
 ### 2. Configurar Variables de Entorno (.env)
 
-Configuramos la conexión hacia MariaDB local.
+Configuramos la conexión hacia la IP del servidor donde corre MariaDB en Docker.
 
 ```bash
 cp .env.example .env
-sed -i 's/DB_HOST=.*/DB_HOST=localhost/g' .env
-sed -i 's/DB_USER=.*/DB_USER=aura_admin/g' .env
+sed -i 's/DB_HOST=localhost/DB_HOST=192.168.68.20/g' .env
 sed -i 's/DB_PASSWORD=/DB_PASSWORD=4dm1n1234/g' .env
+
 ```
 
 ---
@@ -275,9 +225,9 @@ php install.php
 ╚═══════════════════════════════════════════════╝
 
 📋 Configuración detectada:
-   Host: localhost:3306
+   Host: 192.168.68.20:3306
    Base de datos: aura_master
-   Usuario: aura_admin
+   Usuario: root
 
 🔌 Conectando a MySQL...
 ✅ Conexión exitosa.
@@ -414,13 +364,10 @@ El dominio `localhost` solo funciona desde el propio servidor.
 #### 🔴 Error: "Connection refused"
 ```bash
 # Verificar que MariaDB esté corriendo
-sudo systemctl status mariadb
+sudo docker ps | grep mariadb
 
-# Si no está activo, iniciarlo
-sudo systemctl start mariadb
-
-# Verificar conectividad local
-telnet localhost 3306
+# Verificar conectividad
+telnet 192.168.68.20 3306
 ```
 
 **Error: "Access denied for user"**
@@ -429,15 +376,7 @@ telnet localhost 3306
 cat .env | grep DB_
 
 # Probar conexión manual
-mysql -u aura_admin -p4dm1n1234
-
-# Si falla, recrear el usuario
-sudo mysql -u root -p
-# Luego ejecutar:
-# DROP USER IF EXISTS 'aura_admin'@'localhost';
-# CREATE USER 'aura_admin'@'localhost' IDENTIFIED BY '4dm1n1234';
-# GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'localhost' WITH GRANT OPTION;
-# FLUSH PRIVILEGES;
+mysql -h 192.168.68.20 -u root -p
 ```
 
 **Error: "Class SchemaManager not found"**
@@ -478,18 +417,17 @@ sudo netstat -tlnp | grep nginx
 # Estado de servicios
 sudo systemctl status nginx
 sudo systemctl status php8.2-fpm
-sudo systemctl status mariadb
+sudo systemctl status mariadb  # Si es local
 
-# Reiniciar todo el stack
-sudo systemctl restart mariadb php8.2-fpm nginx
+# Reiniciar todo
+sudo systemctl restart php8.2-fpm nginx
 
 # Ver logs en tiempo real
 sudo tail -f /var/log/nginx/aura_error.log
 sudo tail -f /var/log/nginx/aura_access.log
-sudo tail -f /var/log/mysql/error.log
 
-# Probar conectividad a base de datos
-mysql -u aura_admin -p4dm1n1234 -e "SHOW DATABASES;"
+# Probar conectividad a base de datos desde el servidor
+mysql -h 192.168.68.20 -u root -p4dm1n1234 -e "SHOW DATABASES;"
 
 # Verificar permisos de archivos
 ls -la /home/di/aura/public/
@@ -498,25 +436,20 @@ ls -la /home/di/aura/storage/
 # Probar Nginx con curl
 curl -v http://localhost:7474/
 curl -v http://192.168.68.20:7474/
-
-# Acceder a phpMyAdmin
-curl -v http://localhost:7474/phpmyadmin/
 ```
 
 #### 📋 Checklist Final
 
 Antes de pedir ayuda, verifica:
 
-- [ ] MariaDB está corriendo: `sudo systemctl status mariadb`
 - [ ] PHP-FPM está corriendo: `sudo systemctl status php8.2-fpm`
 - [ ] Nginx está corriendo: `sudo systemctl status nginx`
 - [ ] Puerto 7474 está abierto: `sudo netstat -tlnp | grep 7474`
 - [ ] Firewall permite el puerto: `sudo ufw status`
 - [ ] Permisos correctos en storage: `ls -la ~/aura/storage/`
-- [ ] Base de datos accesible: `mysql -u aura_admin -p4dm1n1234`
+- [ ] Base de datos accesible: `mysql -h 192.168.68.20 -u root -p`
 - [ ] Archivo .env configurado: `cat ~/aura/.env`
 - [ ] Logs de error revisados: `sudo tail -50 /var/log/nginx/aura_error.log`
-- [ ] phpMyAdmin accesible: `http://192.168.68.20:7474/phpmyadmin/`
 
 ---
 
@@ -531,16 +464,7 @@ Accede directamente sin configurar hosts:
 http://192.168.68.20:7474/
 ```
 
-**Credenciales Aura:** `admin` / `admin123`
-
-**Acceder a phpMyAdmin:**
-```
-http://192.168.68.20:7474/phpmyadmin/
-```
-
-**Credenciales phpMyAdmin:**
-- Usuario: `aura_admin`
-- Contraseña: `4dm1n1234`
+**Credenciales:** `admin` / `admin123`
 
 #### Opción 2: Acceso por Subdominio (Requiere configuración adicional)
 
