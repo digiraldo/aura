@@ -203,6 +203,69 @@ sudo nft list ruleset | grep 8998
 
 **Nota:** En Debian Trixie, el firewall puede no estar activo por defecto. Si estás en una red local confiable, puedes continuar sin configurar el firewall.
 
+### 8. Solución de Problemas 502 en phpMyAdmin
+
+Si obtienes **502 Bad Gateway** al acceder a phpMyAdmin, sigue estos pasos:
+
+**1. Verificar que PHP-FPM está corriendo:**
+```bash
+sudo systemctl status php8.2-fpm
+
+# Si NO está corriendo (inactive/dead), iniciarlo:
+sudo systemctl start php8.2-fpm
+sudo systemctl enable php8.2-fpm
+```
+
+**2. Ver logs de error específicos de phpMyAdmin:**
+```bash
+sudo tail -50 /var/log/nginx/phpmyadmin_error.log
+```
+
+**3. Verificar que el socket de PHP-FPM existe y tiene permisos correctos:**
+```bash
+ls -la /var/run/php/php8.2-fpm.sock
+
+# Debería mostrar algo como:
+# srw-rw---- 1 www-data www-data 0 Feb 7 22:30 /var/run/php/php8.2-fpm.sock
+```
+
+**4. Si el socket no existe o hay errores, verificar la configuración de PHP-FPM:**
+```bash
+# Ver errores de PHP-FPM
+sudo journalctl -u php8.2-fpm -n 50 --no-pager
+
+# Verificar configuración del pool
+sudo nano /etc/php/8.2/fpm/pool.d/www.conf
+
+# Buscar estas líneas y asegurar que existan:
+# listen = /var/run/php/php8.2-fpm.sock
+# listen.owner = www-data
+# listen.group = www-data
+# listen.mode = 0660
+```
+
+**5. Reiniciar todo y verificar:**
+```bash
+# Reiniciar PHP-FPM
+sudo systemctl restart php8.2-fpm
+
+# Reiniciar Nginx
+sudo systemctl restart nginx
+
+# Verificar estado
+sudo systemctl status php8.2-fpm
+sudo systemctl status nginx
+
+# Verificar que el puerto 8998 está escuchando
+sudo ss -tlnp | grep 8998
+```
+
+**6. Probar desde el servidor:**
+```bash
+# Debería devolver HTML de phpMyAdmin, no un error 502
+curl -I http://localhost:8998/
+```
+
 ---
 
 ## Fase 3: Configuración del Proyecto Aura
