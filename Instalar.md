@@ -397,7 +397,26 @@ sed -n '60,70p' public/index.php
 sed -n '215,230p' public/index.php
 ```
 
-**C. Verificar que los cambios funcionan**
+**C. Reorganizar archivos según namespaces PSR-4**
+```bash
+# Crear directorios para la estructura correcta
+mkdir -p core/lib/Database
+mkdir -p core/lib/Plugins
+mkdir -p core/lib/Auth
+
+# Mover archivos a sus directorios correspondientes
+mv core/lib/SchemaManager.php core/lib/Database/SchemaManager.php
+mv core/lib/PluginLoader.php core/lib/Plugins/PluginLoader.php
+mv core/lib/Auth.php core/lib/Auth/Auth.php
+mv core/lib/Role.php core/lib/Auth/Role.php
+
+# Verificar la estructura
+ls -la core/lib/Database/
+ls -la core/lib/Plugins/
+ls -la core/lib/Auth/
+```
+
+**D. Verificar que los cambios funcionan**
 ```bash
 # Probar sintaxis PHP
 php -l public/index.php
@@ -405,7 +424,7 @@ php -l public/index.php
 
 # Probar ejecución
 php public/index.php
-# No debería mostrar errores de "unexpected token 'use'" ni "Failed to open stream"
+# No debería mostrar errores de clases no encontradas ni "Failed to open stream"
 ```
 
 **Salida esperada:**
