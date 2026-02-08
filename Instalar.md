@@ -131,22 +131,39 @@ sudo nano /etc/nginx/conf.d/aura.conf
 ```
 
 2. **Pegar esta configuración:**
+
+**IMPORTANTE:** Ajusta la IP según tu servidor. Si accedes desde otra máquina, NO uses `localhost`.
+
 ```nginx
 server {
-    listen 80; # Cambiar a 7474 si se desea mantener ese puerto
-    server_name aura.local *.aura.local;
+    listen 7474;
+    
+    # Acepta conexiones por IP, subdominio o localhost
+    server_name 192.168.68.20 aura.local *.aura.local localhost;
 
     root /home/di/aura/public;
-    index index.php;
+    index index.php index.html;
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
     location ~ \.php$ {
+        # Verificar que el archivo existe
+        try_files $uri =404;
+        
         fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
+        
+        # Timeout para scripts largos
+        fastcgi_read_timeout 300;
+    }
+
+    # Denegar acceso a archivos ocultos
+    location ~ /\. {
+        deny all;
     }
 
     error_log /var/log/nginx/aura_error.log;
@@ -155,12 +172,34 @@ server {
 
 ```
 
-**Nota:** Si `include snippets/fastcgi-php.conf;` no existe en tu sistema, se usa directamente `include fastcgi_params;`
-
 3. **Verificar y Reiniciar:**
 ```bash
-sudo nginx -t && sudo systemctl restart nginx
+# Probar configuración
+sudo nginx -t
 
+# Si hay errores, revisar el archivo
+sudo tail -20 /var/log/nginx/aura_error.log
+
+# Verificar que PHP-FPM está corriendo
+sudo systemctl status php8.2-fpm
+
+# Si no está corriendo, iniciarlo
+sudo systemctl start php8.2-fpm
+sudo systemctl enable php8.2-fpm
+
+# Reiniciar Nginx
+sudo systemctl restart nginx
+
+# Verificar que Nginx escucha en el puerto 7474
+sudo netstat -tlnp | grep 7474
+# O con ss:
+sudo ss -tlnp | grep 7474
+
+```
+
+**Salida esperada de netstat:**
+```
+tcp   0   0 0.0.0.0:7474   0.0.0.0:*   LISTEN   1234/nginx
 ```
 
 
@@ -232,7 +271,97 @@ php create_tenant.php empresa_demo
 
 ### Solución de Problemas Comunes
 
-**Error: "Connection refused"**
+#### � Script de Diagnóstico Automático
+
+Ejecuta este script para obtener un reporte completo del estado del sistema:
+
+```bash
+cd ~/aura
+bash diagnostico.sh
+```
+
+El script verificará:
+- Estado de servicios (Nginx, PHP-FPM)
+- Puertos abiertos
+- Permisos de archivos
+- Conexión a base de datos
+- Configuración de Nginx
+- Últimos errores en logs
+
+---
+
+#### �🔴 Error: "502 Bad Gateway" (Tu caso actual)
+
+Este error significa que Nginx no puede comunicarse con PHP-FPM.
+
+**Diagnóstico paso a paso:**
+
+1. **Verificar que PHP-FPM está corriendo:**
+```bash
+sudo systemctl status php8.2-fpm
+
+# Si muestra "inactive (dead)", iniciarlo:
+sudo systemctl start php8.2-fpm
+sudo systemctl enable php8.2-fpm
+```
+
+2. **Verificar que el socket existe:**
+```bash
+ls -la /var/run/php/php8.2-fpm.sock
+
+# Debería mostrar algo como:
+# srw-rw---- 1 www-data www-data 0 Feb 7 22:30 /var/run/php/php8.2-fpm.sock
+```
+
+3. **Verificar permisos del socket:**
+```bash
+# El usuario www-data debe poder acceder
+sudo chmod 666 /var/run/php/php8.2-fpm.sock
+```
+
+4. **Ver errores de PHP-FPM:**
+```bash
+sudo tail -50 /var/log/php8.2-fpm.log
+# O si no existe ese archivo:
+sudo journalctl -u php8.2-fpm -n 50
+```
+
+5. **Ver errores de Nginx:**
+```bash
+sudo tail -50 /var/log/nginx/aura_error.log
+```
+
+6. **Probar PHP manualmente:**
+```bash
+# Crear archivo de prueba
+echo "<?php phpinfo(); ?>" | sudo tee /home/di/aura/public/test.php
+
+# Acceder desde navegador:
+# http://192.168.68.20:7474/test.php
+
+# Si funciona, el problema está en el routing de la app
+```
+
+7. **Reiniciar servicios:**
+```bash
+sudo systemctl restart php8.2-fpm
+sudo systemctl restart nginx
+```
+
+**Causa común:** PHP-FPM no está corriendo o el socket tiene permisos incorrectos.
+
+#### 🔴 Error: "Connection refused" con localhost
+
+**Problema:** Intentas acceder a `empresa_demo.localhost` desde otra máquina.
+
+**Solución:** Usa la IP del servidor:
+```
+http://192.168.68.20:7474/
+```
+
+El dominio `localhost` solo funciona desde el propio servidor.
+
+#### 🔴 Error: "Connection refused"
 ```bash
 # Verificar que MariaDB esté corriendo
 sudo docker ps | grep mariadb
@@ -257,16 +386,116 @@ cd ~/aura
 git pull origin main
 ```
 
----
+#### 🔴 Puerto 7474 Bloqueado en Firewall
 
-## Acceso Final
+```bash
+# Verificar si el firewall está activo
+sudo ufw status
 
-Para entrar desde tu computadora personal, edita el archivo `hosts` de tu sistema (Windows/Mac) y añade:
+# Si está activo, abrir el puerto 7474
+sudo ufw allow 7474/tcp
+sudo ufw reload
 
-```text
-192.168.68.20  aura.local empresa_demo.aura.local
-
+# O con firewalld (CentOS/RHEL)
+sudo firewall-cmd --permanent --add-port=7474/tcp
+sudo firewall-cmd --reload
 ```
 
-**URL de acceso:** `http://empresa_demo.aura.local`
+#### 🔴 Verificar que Nginx Escucha en 7474
+
+```bash
+# Ver puertos abiertos
+sudo netstat -tlnp | grep nginx
+
+# Debería mostrar algo como:
+# tcp   0   0 0.0.0.0:7474   0.0.0.0:*   LISTEN   1234/nginx
+```
+
+#### 🛠️ Comandos Útiles de Diagnóstico
+
+```bash
+# Estado de servicios
+sudo systemctl status nginx
+sudo systemctl status php8.2-fpm
+sudo systemctl status mariadb  # Si es local
+
+# Reiniciar todo
+sudo systemctl restart php8.2-fpm nginx
+
+# Ver logs en tiempo real
+sudo tail -f /var/log/nginx/aura_error.log
+sudo tail -f /var/log/nginx/aura_access.log
+
+# Probar conectividad a base de datos desde el servidor
+mysql -h 192.168.68.20 -u root -p4dm1n1234 -e "SHOW DATABASES;"
+
+# Verificar permisos de archivos
+ls -la /home/di/aura/public/
+ls -la /home/di/aura/storage/
+
+# Probar Nginx con curl
+curl -v http://localhost:7474/
+curl -v http://192.168.68.20:7474/
+```
+
+#### 📋 Checklist Final
+
+Antes de pedir ayuda, verifica:
+
+- [ ] PHP-FPM está corriendo: `sudo systemctl status php8.2-fpm`
+- [ ] Nginx está corriendo: `sudo systemctl status nginx`
+- [ ] Puerto 7474 está abierto: `sudo netstat -tlnp | grep 7474`
+- [ ] Firewall permite el puerto: `sudo ufw status`
+- [ ] Permisos correctos en storage: `ls -la ~/aura/storage/`
+- [ ] Base de datos accesible: `mysql -h 192.168.68.20 -u root -p`
+- [ ] Archivo .env configurado: `cat ~/aura/.env`
+- [ ] Logs de error revisados: `sudo tail -50 /var/log/nginx/aura_error.log`
+
+---
+
+## Fase 6: Acceso y Configuración del Cliente
+
+### Acceso desde tu Computadora Personal
+
+#### Opción 1: Acceso Directo por IP (Recomendado para empezar)
+
+Accede directamente sin configurar hosts:
+```
+http://192.168.68.20:7474/
+```
+
 **Credenciales:** `admin` / `admin123`
+
+#### Opción 2: Acceso por Subdominio (Requiere configuración adicional)
+
+1. **En tu PC Windows/Mac**, edita el archivo `hosts`:
+
+**Windows:** `C:\Windows\System32\drivers\etc\hosts`
+**Mac/Linux:** `/etc/hosts`
+
+Agregar estas líneas:
+```text
+192.168.68.20  aura.local
+192.168.68.20  empresa_demo.aura.local
+```
+
+2. **Acceder a:**
+```
+http://empresa_demo.aura.local:7474/
+```
+
+**Credenciales:** `admin` / `admin123`
+
+### Verificación Rápida
+
+Desde el servidor, prueba:
+```bash
+# Probar PHP desde línea de comandos
+php ~/aura/public/index.php
+
+# Probar acceso local
+curl http://localhost:7474/
+
+# Ver logs en tiempo real
+sudo tail -f /var/log/nginx/aura_error.log
+```
