@@ -259,7 +259,7 @@ sudo bash -c 'cat >> /etc/php/8.2/fpm/pool.d/www.conf << EOF
 ; Configuración de permisos del socket
 listen.owner = www-data
 listen.group = www-data
-listen.mode = 0660
+listen.mode = 0666
 EOF'
 
 # Reiniciar PHP-FPM para aplicar la configuración
@@ -308,11 +308,40 @@ mkdir -p ~/aura/storage/{logs,cache,uploads,sessions}
 mkdir -p ~/aura/plugins
 ```
 
-**Ajustar permisos para el usuario www-data de Nginx**
+**Verificar usuario del servidor web Nginx**
 ```bash
-sudo chown -R di:www-data ~/aura
+# Verificar con qué usuario corre Nginx
+ps aux | grep nginx | grep -v grep | head -2
+
+# O revisar la configuración
+grep "^user" /etc/nginx/nginx.conf
+
+# Si muestra "user nginx;", usa 'nginx' en lugar de 'www-data'
+# Si muestra "user www-data;", usa 'www-data'
+```
+
+**Ajustar permisos según el usuario de Nginx**
+```bash
+# Si Nginx usa el usuario 'nginx':
+sudo chown -R di:nginx ~/aura
 sudo chmod -R 775 ~/aura/storage
 sudo chmod -R 775 ~/aura/plugins
+
+# Si Nginx usa el usuario 'www-data':
+# sudo chown -R di:www-data ~/aura
+# sudo chmod -R 775 ~/aura/storage
+# sudo chmod -R 775 ~/aura/plugins
+```
+
+**IMPORTANTE: Configurar permisos del directorio home (Error 404/502)**
+```bash
+# El servidor web necesita poder atravesar tu directorio home
+# para llegar a ~/aura/public
+sudo chmod o+x /home/di/
+
+# Verificar permisos
+ls -ld /home/di/
+# Debería mostrar: drwxr-x--x (el último x es crucial)
 ```
 
 ### 2. Configurar Variables de Entorno (.env)
@@ -329,6 +358,54 @@ sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=Admin1234/g' .env
 
 # Verificar la configuración
 cat .env | grep DB_
+```
+
+### 3. Corregir Errores de Código (IMPORTANTE)
+
+El código clonado tiene dos errores que causan el error 500. Corregimos aquí:
+
+**A. Corregir ruta de configuración en Bootstrap.php**
+```bash
+cd ~/aura
+
+# Verificar el error actual
+grep -n "__DIR__ . '/config/'" core/lib/Bootstrap.php
+
+# Corregir la ruta (de '/config/' a '/../config/')
+sed -i "s|__DIR__ . '/config/'|__DIR__ . '/../config/'|g" core/lib/Bootstrap.php
+
+# Verificar que se aplicó el cambio
+grep -n "configPath = " core/lib/Bootstrap.php
+# Debería mostrar: $configPath = __DIR__ . '/../config/';
+```
+
+**B. Corregir declaraciones 'use' en index.php**
+```bash
+# Crear backup del archivo
+cp public/index.php public/index.php.backup
+
+# Agregar las declaraciones use después de la línea 62
+sed -i '62 a\use Aura\\Core\\Controllers\\SalesController;\nuse Aura\\Core\\Models\\VentaModel;\nuse Aura\\Core\\Models\\StockModel;' public/index.php
+
+# Eliminar las declaraciones use del bloque try (ahora en líneas 222-224)
+sed -i '222,224d' public/index.php
+
+# Verificar las declaraciones use al inicio (líneas 60-70)
+sed -n '60,70p' public/index.php
+
+# Verificar que se eliminaron del bloque try (líneas 215-230)
+sed -n '215,230p' public/index.php
+```
+
+**C. Verificar que los cambios funcionan**
+```bash
+# Probar sintaxis PHP
+php -l public/index.php
+# Debería mostrar: No syntax errors detected
+
+# Probar ejecución
+php public/index.php
+# No debería mostrar errores de "unexpected token 'use'" ni "Failed to open stream"
 ```
 
 **Salida esperada:**
