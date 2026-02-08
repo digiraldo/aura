@@ -60,7 +60,7 @@ sudo mysql_secure_installation
 
 **Responde a las preguntas:**
 - Switch to unix_socket authentication? **N**
-- Change the root password? **Y** (usar: `4dm1n1234`)
+- Change the root password? **Y** (usar: `Admin1234`)
 - Remove anonymous users? **Y**
 - Disallow root login remotely? **N** (si necesitas acceso remoto)
 - Remove test database? **Y**
@@ -76,7 +76,7 @@ Dentro de MySQL, ejecuta estos comandos:
 
 ```sql
 -- Establecer contraseña para root
-ALTER USER 'root'@'localhost' IDENTIFIED BY '4dm1n1234';
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'Admin1234';
 
 -- Eliminar usuarios anónimos
 DELETE FROM mysql.user WHERE User='';
@@ -86,7 +86,7 @@ DROP DATABASE IF EXISTS test;
 DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
 
 -- Permitir acceso remoto a root (opcional)
-GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '4dm1n1234' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'Admin1234' WITH GRANT OPTION;
 
 -- Recargar privilegios
 FLUSH PRIVILEGES;
@@ -102,8 +102,8 @@ sudo mysql -u root -p
 Dentro de MySQL, ejecuta:
 
 ```sql
-CREATE USER 'aura_admin'@'localhost' IDENTIFIED BY '4dm1n1234';
-CREATE USER 'aura_admin'@'%' IDENTIFIED BY '4dm1n1234';
+CREATE USER 'aura_admin'@'localhost' IDENTIFIED BY 'Admin1234';
+CREATE USER 'aura_admin'@'%' IDENTIFIED BY 'Admin1234';
 GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'localhost' WITH GRANT OPTION;
 GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'%' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
@@ -126,8 +126,8 @@ sudo apt install phpmyadmin -y
 **Durante la instalación:**
 - Servidor web: Selecciona **apache2** (presiona espacio) y luego **Enter** (lo configuraremos para Nginx manualmente)
 - Configurar base de datos con dbconfig-common? **Sí**
-- Password de MySQL para phpmyadmin: `4dm1n1234`
-- Password de aplicación: `4dm1n1234`
+- Password de MySQL para phpmyadmin: `Admin1234`
+- Password de aplicación: `Admin1234`
 
 **Crear enlace simbólico para Nginx:**
 
@@ -171,7 +171,7 @@ Configuramos la conexión hacia MariaDB local.
 cp .env.example .env
 sed -i 's/DB_HOST=.*/DB_HOST=localhost/g' .env
 sed -i 's/DB_USER=.*/DB_USER=aura_admin/g' .env
-sed -i 's/DB_PASSWORD=/DB_PASSWORD=4dm1n1234/g' .env
+sed -i 's/DB_PASSWORD=/DB_PASSWORD=Admin1234/g' .env
 ```
 
 ---
@@ -460,13 +460,13 @@ telnet localhost 3306
 cat .env | grep DB_
 
 # Probar conexión manual
-mysql -u aura_admin -p4dm1n1234
+mysql -u aura_admin -pAdmin1234
 
 # Si falla, recrear el usuario
 sudo mysql -u root -p
 # Luego ejecutar:
 # DROP USER IF EXISTS 'aura_admin'@'localhost';
-# CREATE USER 'aura_admin'@'localhost' IDENTIFIED BY '4dm1n1234';
+# CREATE USER 'aura_admin'@'localhost' IDENTIFIED BY 'Admin1234';
 # GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'localhost' WITH GRANT OPTION;
 # FLUSH PRIVILEGES;
 ```
@@ -520,7 +520,7 @@ sudo tail -f /var/log/nginx/aura_access.log
 sudo tail -f /var/log/mysql/error.log
 
 # Probar conectividad a base de datos
-mysql -u aura_admin -p4dm1n1234 -e "SHOW DATABASES;"
+mysql -u aura_admin -pAdmin1234 -e "SHOW DATABASES;"
 
 # Verificar permisos de archivos
 ls -la /home/di/aura/public/
@@ -544,7 +544,7 @@ Antes de pedir ayuda, verifica:
 - [ ] Puerto 7474 está abierto: `sudo netstat -tlnp | grep 7474`
 - [ ] Firewall permite el puerto: `sudo ufw status`
 - [ ] Permisos correctos en storage: `ls -la ~/aura/storage/`
-- [ ] Base de datos accesible: `mysql -u aura_admin -p4dm1n1234`
+- [ ] Base de datos accesible: `mysql -u aura_admin -pAdmin1234`
 - [ ] Archivo .env configurado: `cat ~/aura/.env`
 - [ ] Logs de error revisados: `sudo tail -50 /var/log/nginx/aura_error.log`
 - [ ] phpMyAdmin accesible: `http://192.168.68.20:7474/phpmyadmin/`
@@ -571,7 +571,7 @@ http://192.168.68.20:7474/phpmyadmin/
 
 **Credenciales phpMyAdmin:**
 - Usuario: `aura_admin`
-- Contraseña: `4dm1n1234`
+- Contraseña: `Admin1234`
 
 #### Opción 2: Acceso por Subdominio (Requiere configuración adicional)
 
