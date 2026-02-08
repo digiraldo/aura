@@ -115,6 +115,29 @@ EXIT;
 ```bash
 sudo apt update
 sudo apt install nginx php8.2-fpm php8.2-mysql php8.2-xml php8.2-mbstring php8.2-curl php8.2-zip -y
+
+# Verificar que las extensiones PHP están instaladas
+php -m | grep -E "pdo|mysql|mysqli"
+
+# Si no aparecen, instalar explícitamente
+sudo apt install php8.2-mysql -y
+sudo systemctl restart php8.2-fpm
+
+# Verificar nuevamente
+php -m | grep -E "PDO|pdo_mysql|mysqli"
+```
+
+**Salida esperada:**
+```
+PDO
+pdo_mysql
+mysqli
+```
+
+Si no ves estas extensiones, ejecuta:
+```bash
+sudo apt install --reinstall php8.2-mysql -y
+sudo systemctl restart php8.2-fpm
 ```
 
 ### 6. Instalar phpMyAdmin
@@ -297,9 +320,22 @@ Configuramos la conexión hacia MariaDB local.
 
 ```bash
 cp .env.example .env
+
+# Configurar base de datos
 sed -i 's/DB_HOST=.*/DB_HOST=localhost/g' .env
 sed -i 's/DB_USER=.*/DB_USER=aura_admin/g' .env
-sed -i 's/DB_PASSWORD=/DB_PASSWORD=Admin1234/g' .env
+sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=Admin1234/g' .env
+
+# Verificar la configuración
+cat .env | grep DB_
+```
+
+**Salida esperada:**
+```
+DB_HOST=localhost
+DB_USER=aura_admin
+DB_PASSWORD=Admin1234
+DB_NAME=aura_master
 ```
 
 ---
@@ -597,6 +633,30 @@ sudo mysql -u root -p
 # CREATE USER 'aura_admin'@'localhost' IDENTIFIED BY 'Admin1234';
 # GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'localhost' WITH GRANT OPTION;
 # FLUSH PRIVILEGES;
+```
+
+**Error: "could not find driver" (PDO MySQL)**
+```bash
+# Verificar extensiones PHP instaladas
+php -m | grep -E "PDO|pdo_mysql|mysqli"
+
+# Si NO aparecen, instalar/reinstalar php8.2-mysql
+sudo apt install --reinstall php8.2-mysql -y
+
+# Reiniciar PHP-FPM
+sudo systemctl restart php8.2-fpm
+
+# Verificar nuevamente
+php -m | grep -E "PDO|pdo_mysql|mysqli"
+
+# Deberías ver:
+# PDO
+# pdo_mysql
+# mysqli
+
+# Intentar nuevamente la instalación
+cd ~/aura
+php install.php
 ```
 
 **Error: "Class SchemaManager not found"**
