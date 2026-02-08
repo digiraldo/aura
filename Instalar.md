@@ -2,18 +2,72 @@
 
 Esta guía detalla la instalación de **Aura Platform** en un servidor Debian/Ubuntu utilizando **todo el stack de forma nativa**: Nginx, PHP 8.2, MariaDB y phpMyAdmin.
 
-## Fase 1: Limpieza Total (Opcional)
+## Fase 1: Limpieza del Sistema
 
-Si tienes instalaciones previas, puedes limpiarlas:
+### Opción A: Primera Instalación (Limpieza Básica)
+
+Si es tu **primera vez** instalando Aura Platform en este servidor, ejecuta esto para limpiar cualquier instalación previa básica:
 
 ```bash
-# Eliminar archivos del proyecto anterior si existe
+# Eliminar directorio del proyecto si existe
 cd ~
 rm -rf ~/aura
 
-# Limpiar bases de datos previas si existen (solo si ya tienes MariaDB instalado)
-mysql -u root -p -e "DROP DATABASE IF EXISTS aura_master; DROP DATABASE IF EXISTS tenant_empresa; DROP DATABASE IF EXISTS tenant_empresa_demo;"
+# Si ya tienes MariaDB instalado con contraseña, limpiar bases de datos previas
+# (Si no tienes MariaDB aún, omite este paso)
+mysql -u root -pAdmin1234 -e "DROP DATABASE IF EXISTS aura_master;" 2>/dev/null || true
+mysql -u aura_admin -pAdmin1234 -e "DROP DATABASE IF EXISTS tenant_empresa_demo;" 2>/dev/null || true
 ```
+
+---
+
+### Opción B: Limpieza Total (Reinstalación Completa)
+
+Si **ya tienes Aura instalado** y quieres empezar completamente de cero, ejecuta esta limpieza completa:
+
+```bash
+# 1. Detener servicios
+sudo systemctl stop nginx
+sudo systemctl stop php8.2-fpm
+sudo systemctl stop mariadb
+
+# 2. Eliminar proyecto
+cd ~
+rm -rf ~/aura
+rm -rf ~/aura.backup 2>/dev/null || true
+
+# 3. Limpiar configuraciones de Nginx
+sudo rm -f /etc/nginx/conf.d/aura.conf
+sudo rm -f /etc/nginx/conf.d/phpmyadmin.conf
+sudo rm -f /etc/nginx/sites-enabled/aura 2>/dev/null || true
+sudo rm -f /etc/nginx/sites-available/aura 2>/dev/null || true
+
+# 4. Limpiar logs
+sudo rm -f /var/log/nginx/aura_*.log
+sudo rm -f /var/log/nginx/phpmyadmin_*.log
+
+# 5. IMPORTANTE: Limpiar bases de datos (ESTO BORRARÁ TODOS TUS DATOS)
+sudo systemctl start mariadb
+mysql -u root -pAdmin1234 << EOF
+DROP DATABASE IF EXISTS aura_master;
+DROP DATABASE IF EXISTS tenant_empresa;
+DROP DATABASE IF EXISTS tenant_empresa_demo;
+DROP USER IF EXISTS 'aura_admin'@'localhost';
+DROP USER IF EXISTS 'aura_admin'@'%';
+FLUSH PRIVILEGES;
+EOF
+
+# 6. Reiniciar MariaDB
+sudo systemctl restart mariadb
+
+# 7. Verificar limpieza
+mysql -u root -pAdmin1234 -e "SHOW DATABASES;"
+# No deberías ver aura_master ni tenant_* en la lista
+
+echo "✅ Limpieza completa finalizada. Ahora puedes continuar con la Fase 2."
+```
+
+**⚠️ ADVERTENCIA:** La Opción B **eliminará TODAS las bases de datos y configuraciones** de Aura. Úsala solo si estás seguro de querer empezar desde cero.
 
 ---
 
