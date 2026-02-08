@@ -54,7 +54,7 @@ cp .env.example .env
 Editar `.env` con tus credenciales de base de datos:
 
 ```env
-DB_HOST=localhost
+DB_HOST=localhost Sitienen IP ajustala aqui
 DB_PORT=3306
 DB_DATABASE=aura_master
 DB_USERNAME=root
@@ -72,6 +72,14 @@ Ejecutar script de instalación:
 ```bash
 php install.php
 ```
+
+Si esta usando php en docker con el nginx de docker, es posible que necesite ejecutar el comando dentro del contenedor:
+
+```bash
+sudo docker exec -it linuxserver-nginx-app-1 php /aura/install.php
+```
+
+###
 
 ### 4. Configurar Servidor Web
 
@@ -103,7 +111,92 @@ server {
 }
 ```
 
+#### Docker .yaml
+
+```yaml
+    volumes:
+      - type: bind
+        source: /srv/lsio/nginx/config
+        target: /config
+      # AÑADE ESTA LÍNEA (Ajusta /home/di/aura si la ruta es distinta)
+      - type: bind
+        source: /home/di/aura
+        target: /aura
+```
+
+* Configura el Virtual Host
+En lugar de crear un archivo nuevo desde cero, la imagen de LinuxServer espera que edites sus archivos de configuración en la ruta del host.
+
+Ve a: `/srv/lsio/nginx/config/nginx/site-confs/`
+
+Edita el archivo llamado `default.conf` (o crea uno nuevo ahí si prefieres).
+
+Usa esta configuración adaptada para el contenedor:
+
+Nginx
+
+```nginx
+server {
+    listen 80;
+    server_name aura.local;
+    
+    # La ruta es /aura porque es como la mapeamos en el paso 1
+    root /aura/public; 
+    index index.php;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        # En esta imagen de Docker, PHP-FPM escucha habitualmente en 127.0.0.1:9000
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+```
+
+```nginx
+server {
+    listen 80;
+    server_name aura.local *.aura.local; # Permite subdominios para los tenants
+    
+    root /aura/public; 
+    index index.php;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+```
+
+###
+
 ### 5. Crear Primer Tenant
+
+* Crear tu primer "Inquilino" (Tenant)
+Para poder usar el sistema, necesitas crear una base de datos para tu empresa demo. Ejecuta este comando desde tu terminal:
+
+```bash
+sudo docker exec -it linuxserver-nginx-app-1 php /aura/create_tenant.php empresa_demo
+```
+
+Si te da error de permisos, recuerda ejecutar primero: sudo chown -R di:di /home/di/aura.
+
+```bash
+sudo chown -R di:di /home/di/aura
+```
+Si no estas usando docker, simplemente usa:
+
 
 ```php
 <?php
