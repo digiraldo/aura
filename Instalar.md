@@ -8,6 +8,7 @@ Antes de comenzar, eliminamos instalaciones previas y bases de datos para evitar
 
 1. **Eliminar archivos del proyecto:**
 ```bash
+cd ~
 rm -rf ~/aura
 
 ```
