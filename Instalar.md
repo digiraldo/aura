@@ -221,50 +221,55 @@ sudo systemctl enable php8.2-fpm
 sudo tail -50 /var/log/nginx/phpmyadmin_error.log
 ```
 
-**3. Verificar que el socket de PHP-FPM existe y tiene permisos correctos:**
+**Si ves errores como "Permission denied" al socket PHP-FPM, continúa con el paso 3.**
+
+**3. SOLUCIÓN: Ajustar permisos del socket PHP-FPM (Error más común)**
+
 ```bash
+# Ver permisos actuales del socket
 ls -la /var/run/php/php8.2-fpm.sock
 
-# Debería mostrar algo como:
-# srw-rw---- 1 www-data www-data 0 Feb 7 22:30 /var/run/php/php8.2-fpm.sock
-```
-
-**4. Si el socket no existe o hay errores, verificar la configuración de PHP-FPM:**
-```bash
-# Ver errores de PHP-FPM
-sudo journalctl -u php8.2-fpm -n 50 --no-pager
-
-# Verificar configuración del pool
+# Editar configuración del pool de PHP-FPM
 sudo nano /etc/php/8.2/fpm/pool.d/www.conf
-
-# Buscar estas líneas y asegurar que existan:
-# listen = /var/run/php/php8.2-fpm.sock
-# listen.owner = www-data
-# listen.group = www-data
-# listen.mode = 0660
 ```
 
-**5. Reiniciar todo y verificar:**
+**Buscar y modificar estas líneas (o agregarlas si no existen):**
+
+```ini
+listen = /var/run/php/php8.2-fpm.sock
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+```
+
+**Guardar:** `Ctrl+O`, `Enter`, `Ctrl+X`
+
+**Aplicar cambios:**
+
 ```bash
-# Reiniciar PHP-FPM
+# Reiniciar PHP-FPM para aplicar la configuración
 sudo systemctl restart php8.2-fpm
 
 # Reiniciar Nginx
 sudo systemctl restart nginx
 
-# Verificar estado
-sudo systemctl status php8.2-fpm
-sudo systemctl status nginx
+# Verificar permisos del socket (debería mostrar www-data:www-data)
+ls -la /var/run/php/php8.2-fpm.sock
+```
 
-# Verificar que el puerto 8998 está escuchando
+**4. Verificar que funciona:**
+```bash
+# Este comando debería devolver "HTTP/1.1 200 OK" o redireccionamiento, NO 502
+curl -I http://localhost:8998/
+
+# Verificar que el puerto está escuchando
 sudo ss -tlnp | grep 8998
 ```
 
-**6. Probar desde el servidor:**
-```bash
-# Debería devolver HTML de phpMyAdmin, no un error 502
-curl -I http://localhost:8998/
-```
+**5. Probar en navegador:**
+Abre: `http://192.168.68.20:8998/`
+
+Deberías ver la página de login de phpMyAdmin.
 
 ---
 
