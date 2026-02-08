@@ -595,6 +595,10 @@ php -l public/index.php
 No syntax errors detected in public/index.php
 ```
 
+**✅ Fase 3 completada. Ahora DEBES continuar con la Fase 4 para configurar Nginx.**
+
+**⚠️ IMPORTANTE:** Sin la configuración de Nginx (Fase 4), la aplicación NO será accesible. Si intentas acceder ahora verás el error `ERR_CONNECTION_REFUSED`.
+
 ---
 
 ## Fase 4: Configuración del Servidor Web (Nginx)
