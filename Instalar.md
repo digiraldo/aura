@@ -50,9 +50,13 @@ sudo systemctl status mariadb
 
 ### 3. Configurar Seguridad de MariaDB
 
+**Opción A: Usar el asistente de seguridad (si está disponible)**
+
 ```bash
 sudo mysql_secure_installation
 ```
+
+**Si el comando anterior da error "command not found", usa la Opción B.**
 
 **Responde a las preguntas:**
 - Switch to unix_socket authentication? **N**
@@ -61,6 +65,33 @@ sudo mysql_secure_installation
 - Disallow root login remotely? **N** (si necesitas acceso remoto)
 - Remove test database? **Y**
 - Reload privilege tables now? **Y**
+
+**Opción B: Configuración manual de seguridad (si el comando no existe)**
+
+```bash
+sudo mysql
+```
+
+Dentro de MySQL, ejecuta estos comandos:
+
+```sql
+-- Establecer contraseña para root
+ALTER USER 'root'@'localhost' IDENTIFIED BY '4dm1n1234';
+
+-- Eliminar usuarios anónimos
+DELETE FROM mysql.user WHERE User='';
+
+-- Eliminar base de datos de prueba
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+
+-- Permitir acceso remoto a root (opcional)
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '4dm1n1234' WITH GRANT OPTION;
+
+-- Recargar privilegios
+FLUSH PRIVILEGES;
+EXIT;
+```
 
 ### 4. Crear Usuario de Base de Datos
 
