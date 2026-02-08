@@ -1,52 +1,58 @@
-# Guía de Instalación: Aura Platform (Nativo + DB Docker)
+# Guía de Instalación de Aura Platform
 
-Esta guía detalla la instalación de **Aura Platform** en un servidor Debian/Ubuntu utilizando **Nginx y PHP 8.2 de forma nativa**, manteniendo la base de datos **MariaDB en Docker**.
+**Sistema Objetivo:** Debian GNU/Linux 13 (Trixie) / Ubuntu 22.04+
 
-## Fase 1: Limpieza Total
-
-Antes de comenzar, eliminamos instalaciones previas y bases de datos para evitar conflictos.
-
-1. **Eliminar archivos del proyecto:**
-```bash
-cd ~
-rm -rf ~/aura
-
-```
-
-
-2. **Limpiar base de datos en Docker:**
-```bash
-sudo docker exec -it mariadb mariadb -u root -e "DROP DATABASE IF EXISTS aura_master; DROP DATABASE IF EXISTS tenant_empresa; DROP DATABASE IF EXISTS tenant_empresa_demo;"
-
-```
-
-
-3. **Eliminar repositorios con errores (Cloudflare Key Expired):**
-```bash
-sudo rm -f /etc/apt/sources.list.d/cloudflare-client.list
-sudo rm -rf /var/lib/apt/lists/*
-
-```
-
-
+**Stack:**
+- Nginx (nativo)
+- PHP 8.2+ FPM (nativo)
+- MariaDB 10.6+ (Docker)
+- IP Servidor: 192.168.68.20
+- Puerto Web: 7474
 
 ---
 
-## Fase 2: Instalación de Dependencias (Nativo)
+## Fase 1: Instalar Docker y MariaDB
 
-### 1. Preparar Repositorios de PHP (Debian Trixie/Testing)
-
-Instalamos el repositorio de **Ondřej Surý** para obtener PHP 8.2 correctamente.
+### 1. Instalar Docker
 
 ```bash
 sudo apt update
-sudo apt install lsb-release apt-transport-https ca-certificates curl -y
+sudo apt install docker.io docker-compose -y
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Agregar tu usuario al grupo docker (opcional, para no usar sudo)
+sudo usermod -aG docker $USER
+# Cerrar sesión y volver a entrar para que surta efecto
 ```
-**Agregar llave y repositorio de PHP**
+
+### 2. Levantar MariaDB en Docker
 
 ```bash
-sudo curl -sSLo /usr/share/keyrings/deb.sury.org-php.gpg https://packages.sury.org/php/apt.gpg
-echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/php.list
+docker run -d \
+  --name mariadb-aura \
+  -e MYSQL_ROOT_PASSWORD=4dm1n1234 \
+  -p 3306:3306 \
+  --restart unless-stopped \
+  mariadb:10.6
+```
+
+**Verificar que esté corriendo:**
+
+```bash
+docker ps
+docker logs mariadb-aura
+```
+
+---
+
+## Fase 2: Instalar Software Nativo
+
+### 1. Instalar Git
+
+```bash
+sudo apt update
+sudo apt install git -y
 ```
 
 ### 2. Instalar Nginx y PHP 8.2
@@ -54,14 +60,25 @@ echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.
 ```bash
 sudo apt update
 sudo apt install nginx php8.2-fpm php8.2-mysql php8.2-xml php8.2-mbstring php8.2-curl php8.2-zip -y
-
 ```
 
 ---
 
 ## Fase 3: Configuración del Proyecto Aura
 
-### 1. Clonar y Permisos
+### 1. Preparar Sistema de Permisos
+
+**IMPORTANTE:** Nginx (usuario `www-data`) necesita acceso a tu directorio home y al socket de PHP-FPM.
+
+```bash
+# Agregar www-data al grupo de tu usuario
+sudo usermod -aG di www-data
+
+# Permitir que www-data pueda "atravesar" tu directorio home
+chmod 755 /home/di
+```
+
+### 2. Clonar Repositorio
 
 ```bash
 cd ~
@@ -69,20 +86,60 @@ git clone https://github.com/digiraldo/aura.git
 cd aura
 ```
 
-**Crear directorios necesarios si no existen (por si acaso)**
+### 3. Configurar Permisos del Proyecto
+
 ```bash
+# Asignar propietario (di) y grupo (www-data)
+sudo chown -R di:www-data ~/aura
+
+# Permisos para directorios: 755 (rwxr-xr-x)
+find ~/aura -type d -exec chmod 755 {} \;
+
+# Permisos para archivos: 644 (rw-r--r--)
+find ~/aura -type f -exec chmod 644 {} \;
+
+# Storage y plugins deben ser escribibles por www-data: 775 (rwxrwxr-x)
+chmod -R 775 ~/aura/storage
+chmod -R 775 ~/aura/plugins
+
+# Crear subdirectorios en storage si no existen
 mkdir -p ~/aura/storage/{logs,cache,uploads,sessions}
 mkdir -p ~/aura/plugins
 ```
 
-**Ajustar permisos para el usuario www-data de Nginx**
+### 4. Configurar Socket PHP-FPM
+
+Editar configuración del pool de PHP-FPM:
+
 ```bash
-sudo chown -R di:www-data ~/aura
-sudo chmod -R 775 ~/aura/storage
-sudo chmod -R 775 ~/aura/plugins
+sudo nano /etc/php/8.2/fpm/pool.d/www.conf
 ```
 
-### 2. Configurar Variables de Entorno (.env)
+**Buscar y modificar (o agregar si no existen) estas líneas:**
+
+```ini
+listen = /var/run/php/php8.2-fpm.sock
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+```
+
+**Guardar:** `Ctrl+O`, `Enter`, `Ctrl+X`
+
+**Reiniciar PHP-FPM para aplicar cambios:**
+
+```bash
+sudo systemctl restart php8.2-fpm
+
+# Verificar que inició correctamente
+sudo systemctl status php8.2-fpm
+
+# Verificar permisos del socket
+ls -la /var/run/php/php8.2-fpm.sock
+# Debería mostrar: srw-rw---- 1 www-data www-data
+```
+
+### 5. Configurar Variables de Entorno (.env)
 
 Configuramos la conexión hacia la IP del servidor donde corre MariaDB en Docker.
 
@@ -90,7 +147,6 @@ Configuramos la conexión hacia la IP del servidor donde corre MariaDB en Docker
 cp .env.example .env
 sed -i 's/DB_HOST=localhost/DB_HOST=192.168.68.20/g' .env
 sed -i 's/DB_PASSWORD=/DB_PASSWORD=4dm1n1234/g' .env
-
 ```
 
 ---
@@ -100,16 +156,15 @@ sed -i 's/DB_PASSWORD=/DB_PASSWORD=4dm1n1234/g' .env
 ### Opción A: Si tienes directorio sites-available (Ubuntu/Debian con configuración estándar)
 
 1. **Verificar si existe el directorio:**
+
 ```bash
 ls -la /etc/nginx/sites-available/
-
 ```
 
 Si existe, continúa con estos pasos:
 
 ```bash
 sudo nano /etc/nginx/sites-available/aura
-
 ```
 
 Pega la configuración y luego activa:
@@ -117,385 +172,431 @@ Pega la configuración y luego activa:
 ```bash
 sudo ln -s /etc/nginx/sites-available/aura /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl restart nginx
-
 ```
 
-### Opción B: Si NO existe sites-available (tu caso actual)
+### Opción B: Si NO tienes sites-available (Debian Trixie, por ejemplo)
 
-Usa el directorio `conf.d` que es el estándar en muchas instalaciones:
+Usa el directorio `conf.d/`:
 
-1. **Crear archivo directamente en conf.d:**
 ```bash
 sudo nano /etc/nginx/conf.d/aura.conf
-
 ```
 
-2. **Pegar esta configuración:**
-
-**IMPORTANTE:** Ajusta la IP según tu servidor. Si accedes desde otra máquina, NO uses `localhost`.
+**Pegar esta configuración en el archivo:**
 
 ```nginx
 server {
     listen 7474;
-    
-    # Acepta conexiones por IP, subdominio o localhost
-    server_name 192.168.68.20 aura.local *.aura.local localhost;
+    server_name 192.168.68.20 localhost;
 
     root /home/di/aura/public;
     index index.php index.html;
 
+    # Logs
+    access_log /var/log/nginx/aura_access.log;
+    error_log /var/log/nginx/aura_error.log;
+
+    # Ruta principal
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
+    # Procesar PHP con PHP-FPM
     location ~ \.php$ {
-        # Verificar que el archivo existe
-        try_files $uri =404;
-        
+        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
-        fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
-        
-        # Timeout para scripts largos
-        fastcgi_read_timeout 300;
     }
 
     # Denegar acceso a archivos ocultos
     location ~ /\. {
         deny all;
     }
-
-    error_log /var/log/nginx/aura_error.log;
-    access_log /var/log/nginx/aura_access.log;
 }
-
 ```
 
-3. **Verificar y Reiniciar:**
+**Guardar:** `Ctrl+O`, `Enter`, `Ctrl+X`
+
+**Probar configuración y reiniciar:**
+
 ```bash
-# Probar configuración
 sudo nginx -t
-
-# Si hay errores, revisar el archivo
-sudo tail -20 /var/log/nginx/aura_error.log
-
-# Verificar que PHP-FPM está corriendo
-sudo systemctl status php8.2-fpm
-
-# Si no está corriendo, iniciarlo
-sudo systemctl start php8.2-fpm
-sudo systemctl enable php8.2-fpm
-
-# Reiniciar Nginx
 sudo systemctl restart nginx
-
-# Verificar que Nginx escucha en el puerto 7474
-sudo netstat -tlnp | grep 7474
-# O con ss:
-sudo ss -tlnp | grep 7474
-
 ```
-
-**Salida esperada de netstat:**
-```
-tcp   0   0 0.0.0.0:7474   0.0.0.0:*   LISTEN   1234/nginx
-```
-
-
 
 ---
 
-## Fase 5: Finalizar Instalación
+## Fase 5: Inicializar Base de Datos
 
-Ejecutamos los scripts de Aura utilizando el PHP nativo del sistema:
+### 1. Crear Base de Datos Maestra
 
-1. **Instalar Base de Datos Master:**
 ```bash
 cd ~/aura
 php install.php
-
 ```
 
 **Salida esperada:**
 ```
-╔═══════════════════════════════════════════════╗
-║   AURA PLATFORM - INSTALACIÓN AUTOMÁTICA    ║
-║      El WordPress de la Contabilidad         ║
-╚═══════════════════════════════════════════════╝
-
-📋 Configuración detectada:
-   Host: 192.168.68.20:3306
-   Base de datos: aura_master
-   Usuario: root
-
-🔌 Conectando a MySQL...
-✅ Conexión exitosa.
-
-🗄️  Verificando base de datos master...
-✅ Base de datos 'aura_master' creada.
-
-📊 Creando tabla de tenants...
-✅ Tabla 'tenants' creada.
-...
+✅ Base de datos 'aura_master' creada exitosamente
+✅ Tabla 'tenants' creada
+✅ Tabla 'plugins' creada
+✅ Tabla 'configuracion_global' creada
+✅ Directorios creados: storage/, plugins/
 ```
 
-2. **Crear Tenant de prueba:**
-```bash
-php create_tenant.php empresa_demo
+### 2. Crear Primer Tenant
 
+```bash
+php create_tenant.php --name="Mi Empresa" --codigo="empresa1"
 ```
 
 **Salida esperada:**
 ```
-╔═══════════════════════════════════════════════╗
-║      AURA PLATFORM - CREACIÓN DE TENANT      ║
-╚═══════════════════════════════════════════════╝
-
-📋 Información del Tenant:
-   Nombre: empresa_demo
-   Usuario Admin: admin
-   Contraseña: ********
-
-¿Desea continuar? (s/n): s
-
-🔌 Conectando a base de datos master...
-✅ Conectado a aura_master
-
-🏗️  Creando tenant...
-   (esto puede tardar unos segundos)
-
-✅ Tenant creado exitosamente!
-...
+=== Creando Tenant: Mi Empresa (empresa1) ===
+✅ Tenant registrado en master con ID: 1
+✅ Schema 'aura_empresa1' creado
+✅ Tabla 'empresas' creada
+✅ Tabla 'usuarios' creada
+✅ Tabla 'roles_permisos' creada
+... (más tablas)
+✅ Usuario admin creado
 ```
-
-### Solución de Problemas Comunes
-
-#### � Script de Diagnóstico Automático
-
-Ejecuta este script para obtener un reporte completo del estado del sistema:
-
-```bash
-cd ~/aura
-bash diagnostico.sh
-```
-
-El script verificará:
-- Estado de servicios (Nginx, PHP-FPM)
-- Puertos abiertos
-- Permisos de archivos
-- Conexión a base de datos
-- Configuración de Nginx
-- Últimos errores en logs
 
 ---
 
-#### �🔴 Error: "502 Bad Gateway" (Tu caso actual)
+## Fase 6: Verificación
 
-Este error significa que Nginx no puede comunicarse con PHP-FPM.
+### 1. Verificar Servicios
 
-**Diagnóstico paso a paso:**
-
-1. **Verificar que PHP-FPM está corriendo:**
 ```bash
+sudo systemctl status nginx
 sudo systemctl status php8.2-fpm
-
-# Si muestra "inactive (dead)", iniciarlo:
-sudo systemctl start php8.2-fpm
-sudo systemctl enable php8.2-fpm
+docker ps  # Verificar que mariadb-aura está corriendo
 ```
 
-2. **Verificar que el socket existe:**
+### 2. Verificar Permisos
+
 ```bash
+ls -la ~/aura/public/
 ls -la /var/run/php/php8.2-fpm.sock
-
-# Debería mostrar algo como:
-# srw-rw---- 1 www-data www-data 0 Feb 7 22:30 /var/run/php/php8.2-fpm.sock
 ```
 
-3. **Verificar permisos del socket:**
+Deberías ver:
+- `/home/di/aura/public/` con permisos `drwxr-xr-x`
+- Socket con permisos `srw-rw----` y owner `www-data:www-data`
+
+### 3. Probar en Navegador
+
+Abre en tu navegador:
+
+```
+http://192.168.68.20:7474
+```
+
+**Deberías ver:** Página de login de Aura Platform
+
+**Credenciales del primer tenant:**
+- Usuario: `admin`
+- Contraseña: `admin123`
+
+---
+
+## Troubleshooting
+
+### Problema 1: Error 502 Bad Gateway
+
+**Síntomas:** Al acceder a `http://192.168.68.20:7474` aparece error 502.
+
+**Diagnóstico:**
+
 ```bash
-# El usuario www-data debe poder acceder
-sudo chmod 666 /var/run/php/php8.2-fpm.sock
+sudo tail -f /var/log/nginx/aura_error.log
 ```
 
-4. **Ver errores de PHP-FPM:**
+Si ves:
+```
+connect() to unix:/var/run/php/php8.2-fpm.sock failed (13: Permission denied)
+```
+
+**Solución:**
+
+1. Verificar configuración del socket PHP-FPM:
+
 ```bash
-sudo tail -50 /var/log/php8.2-fpm.log
-# O si no existe ese archivo:
-sudo journalctl -u php8.2-fpm -n 50
+sudo nano /etc/php/8.2/fpm/pool.d/www.conf
 ```
 
-5. **Ver errores de Nginx:**
-```bash
-sudo tail -50 /var/log/nginx/aura_error.log
+Asegurar estas líneas:
+```ini
+listen = /var/run/php/php8.2-fpm.sock
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
 ```
 
-6. **Probar PHP manualmente:**
-```bash
-# Crear archivo de prueba
-echo "<?php phpinfo(); ?>" | sudo tee /home/di/aura/public/test.php
+2. Reiniciar PHP-FPM:
 
-# Acceder desde navegador:
-# http://192.168.68.20:7474/test.php
-
-# Si funciona, el problema está en el routing de la app
-```
-
-7. **Reiniciar servicios:**
 ```bash
 sudo systemctl restart php8.2-fpm
+```
+
+3. Si persiste, verificar que www-data tenga acceso al directorio home:
+
+```bash
+chmod 755 /home/di
+sudo usermod -aG di www-data
+```
+
+4. **IMPORTANTE:** Cerrar sesión de www-data para que los cambios de grupo surtan efecto:
+
+```bash
+# Reiniciar Nginx para que www-data cargue sus nuevos grupos
 sudo systemctl restart nginx
 ```
 
-**Causa común:** PHP-FPM no está corriendo o el socket tiene permisos incorrectos.
+### Problema 2: stat() '/home/di/aura/public/' failed (13: Permission denied)
 
-#### 🔴 Error: "Connection refused" con localhost
+**Síntomas:** Nginx no puede acceder al directorio público.
 
-**Problema:** Intentas acceder a `empresa_demo.localhost` desde otra máquina.
+**Solución:**
 
-**Solución:** Usa la IP del servidor:
+```bash
+# Dar permiso de ejecución al directorio home (para "atravesar")
+chmod 755 /home/di
+
+# Verificar permisos del proyecto
+ls -la ~/aura/
+# Debería mostrar: drwxr-xr-x di www-data
+
+# Si no, corregir:
+sudo chown -R di:www-data ~/aura
+find ~/aura -type d -exec chmod 755 {} \;
+
+# Reiniciar Nginx
+sudo systemctl restart nginx
 ```
-http://192.168.68.20:7474/
-```
 
-El dominio `localhost` solo funciona desde el propio servidor.
+### Problema 3: Connection refused al conectar a MySQL
 
-#### 🔴 Error: "Connection refused"
+**Síntomas:** Scripts PHP no pueden conectar a la base de datos.
+
+**Diagnóstico:**
+
 ```bash
 # Verificar que MariaDB esté corriendo
-sudo docker ps | grep mariadb
+docker ps
 
-# Verificar conectividad
-telnet 192.168.68.20 3306
+# Probar conexión desde el host
+mysql -h 192.168.68.20 -u root -p4dm1n1234
 ```
 
-**Error: "Access denied for user"**
-```bash
-# Verificar credenciales en .env
-cat .env | grep DB_
+**Soluciones posibles:**
 
-# Probar conexión manual
-mysql -h 192.168.68.20 -u root -p
+1. Si el contenedor no está corriendo:
+
+```bash
+docker start mariadb-aura
 ```
 
-**Error: "Class SchemaManager not found"**
+2. Si MariaDB solo escucha en localhost del contenedor:
+
 ```bash
-# Asegurarse de tener la última versión
+# Recrear el contenedor con bind correcto
+docker stop mariadb-aura
+docker rm mariadb-aura
+
+docker run -d \
+  --name mariadb-aura \
+  -e MYSQL_ROOT_PASSWORD=4dm1n1234 \
+  -p 3306:3306 \
+  --restart unless-stopped \
+  mariadb:10.6
+```
+
+3. Verificar `.env` tiene la IP correcta:
+
+```bash
+cat ~/aura/.env | grep DB_HOST
+# Debe mostrar: DB_HOST=192.168.68.20
+```
+
+### Problema 4: Class 'Aura\...' not found
+
+**Síntomas:** Error de autoload o namespace incorrecto.
+
+**Solución:**
+
+```bash
 cd ~/aura
-git pull origin main
+
+# Verificar que existe composer.json con autoload PSR-4
+cat composer.json
+
+# Si necesitas regenerar autoload
+composer dump-autoload
 ```
 
-#### 🔴 Puerto 7474 Bloqueado en Firewall
+### Script de Diagnóstico Automatizado
+
+Creado en `diagnostico.sh`. Para usarlo:
 
 ```bash
-# Verificar si el firewall está activo
-sudo ufw status
-
-# Si está activo, abrir el puerto 7474
-sudo ufw allow 7474/tcp
-sudo ufw reload
-
-# O con firewalld (CentOS/RHEL)
-sudo firewall-cmd --permanent --add-port=7474/tcp
-sudo firewall-cmd --reload
+cd ~/aura
+chmod +x diagnostico.sh
+./diagnostico.sh
 ```
 
-#### 🔴 Verificar que Nginx Escucha en 7474
-
-```bash
-# Ver puertos abiertos
-sudo netstat -tlnp | grep nginx
-
-# Debería mostrar algo como:
-# tcp   0   0 0.0.0.0:7474   0.0.0.0:*   LISTEN   1234/nginx
-```
-
-#### 🛠️ Comandos Útiles de Diagnóstico
-
-```bash
-# Estado de servicios
-sudo systemctl status nginx
-sudo systemctl status php8.2-fpm
-sudo systemctl status mariadb  # Si es local
-
-# Reiniciar todo
-sudo systemctl restart php8.2-fpm nginx
-
-# Ver logs en tiempo real
-sudo tail -f /var/log/nginx/aura_error.log
-sudo tail -f /var/log/nginx/aura_access.log
-
-# Probar conectividad a base de datos desde el servidor
-mysql -h 192.168.68.20 -u root -p4dm1n1234 -e "SHOW DATABASES;"
-
-# Verificar permisos de archivos
-ls -la /home/di/aura/public/
-ls -la /home/di/aura/storage/
-
-# Probar Nginx con curl
-curl -v http://localhost:7474/
-curl -v http://192.168.68.20:7474/
-```
-
-#### 📋 Checklist Final
-
-Antes de pedir ayuda, verifica:
-
-- [ ] PHP-FPM está corriendo: `sudo systemctl status php8.2-fpm`
-- [ ] Nginx está corriendo: `sudo systemctl status nginx`
-- [ ] Puerto 7474 está abierto: `sudo netstat -tlnp | grep 7474`
-- [ ] Firewall permite el puerto: `sudo ufw status`
-- [ ] Permisos correctos en storage: `ls -la ~/aura/storage/`
-- [ ] Base de datos accesible: `mysql -h 192.168.68.20 -u root -p`
-- [ ] Archivo .env configurado: `cat ~/aura/.env`
-- [ ] Logs de error revisados: `sudo tail -50 /var/log/nginx/aura_error.log`
+Revisa:
+- ✅/❌ Servicios corriendo
+- ✅/❌ Puertos abiertos
+- ✅/❌ Estructura de directorios
+- ✅/❌ Permisos
+- ✅/❌ Conexión a base de datos
+- ✅/❌ Configuración Nginx
 
 ---
 
-## Fase 6: Acceso y Configuración del Cliente
+## Comandos Útiles
 
-### Acceso desde tu Computadora Personal
+### Reiniciar todo el stack
 
-#### Opción 1: Acceso Directo por IP (Recomendado para empezar)
-
-Accede directamente sin configurar hosts:
-```
-http://192.168.68.20:7474/
-```
-
-**Credenciales:** `admin` / `admin123`
-
-#### Opción 2: Acceso por Subdominio (Requiere configuración adicional)
-
-1. **En tu PC Windows/Mac**, edita el archivo `hosts`:
-
-**Windows:** `C:\Windows\System32\drivers\etc\hosts`
-**Mac/Linux:** `/etc/hosts`
-
-Agregar estas líneas:
-```text
-192.168.68.20  aura.local
-192.168.68.20  empresa_demo.aura.local
-```
-
-2. **Acceder a:**
-```
-http://empresa_demo.aura.local:7474/
-```
-
-**Credenciales:** `admin` / `admin123`
-
-### Verificación Rápida
-
-Desde el servidor, prueba:
 ```bash
-# Probar PHP desde línea de comandos
-php ~/aura/public/index.php
-
-# Probar acceso local
-curl http://localhost:7474/
-
-# Ver logs en tiempo real
-sudo tail -f /var/log/nginx/aura_error.log
+sudo systemctl restart nginx
+sudo systemctl restart php8.2-fpm
+docker restart mariadb-aura
 ```
+
+### Ver logs en tiempo real
+
+```bash
+# Nginx
+sudo tail -f /var/log/nginx/aura_error.log
+
+# PHP-FPM
+sudo tail -f /var/log/php8.2-fpm.log
+
+# MariaDB
+docker logs -f mariadb-aura
+
+# Logs de aplicación Aura
+tail -f ~/aura/storage/logs/app.log
+```
+
+### Conectar a MySQL desde CLI
+
+```bash
+mysql -h 192.168.68.20 -u root -p4dm1n1234
+```
+
+Una vez dentro:
+
+```sql
+SHOW DATABASES;
+USE aura_master;
+SHOW TABLES;
+SELECT * FROM tenants;
+```
+
+### Limpiar y reinstalar
+
+```bash
+# Eliminar base de datos
+mysql -h 192.168.68.20 -u root -p4dm1n1234 -e "DROP DATABASE IF EXISTS aura_master;"
+
+# Volver a correr instalación
+cd ~/aura
+php install.php
+php create_tenant.php --name="Mi Empresa" --codigo="empresa1"
+```
+
+---
+
+## Arquitectura del Sistema
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    CLIENTE (Navegador)                   │
+│              http://192.168.68.20:7474                   │
+└────────────────────┬────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│                  Nginx (Puerto 7474)                     │
+│              /home/di/aura/public/                       │
+│              Usuario: www-data                           │
+└────────────────────┬────────────────────────────────────┘
+                     │ Unix Socket
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│            PHP 8.2 FPM (Socket Unix)                     │
+│       /var/run/php/php8.2-fpm.sock                       │
+│       Usuario: www-data                                  │
+│       ┌─────────────────────────────────┐               │
+│       │   /public/index.php (Router)    │               │
+│       │   ↓                              │               │
+│       │   Core: Auth, SchemaManager,    │               │
+│       │   Controllers, Bootstrap        │               │
+│       └─────────────────────────────────┘               │
+└────────────────────┬────────────────────────────────────┘
+                     │ TCP/IP
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│        MariaDB 10.6 (Docker en Puerto 3306)             │
+│              IP: 192.168.68.20                           │
+│              Usuario: root / 4dm1n1234                   │
+│       ┌─────────────────────────────────┐               │
+│       │  aura_master (Registro Global)  │               │
+│       │  aura_tenant1 (Empresa 1)       │               │
+│       │  aura_tenant2 (Empresa 2)       │               │
+│       │  ...                             │               │
+│       └─────────────────────────────────┘               │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Flujo de Autenticación
+
+1. Usuario ingresa credenciales en `/login`
+2. PHP consulta `aura_master.tenants` para validar código de tenant
+3. Se cambia conexión a schema del tenant (`aura_empresa1`)
+4. Se valida usuario/password en `usuarios` del tenant
+5. Se cargan permisos desde `roles_permisos`
+6. Se crea sesión PHP con datos del tenant y usuario
+7. Se redirige a `/dashboard`
+
+### Aislamiento de Datos
+
+- **Nivel 1 (Master):** Base de datos `aura_master` con registro de todos los tenants
+- **Nivel 2 (Tenant):** Cada tenant tiene su propio schema MySQL (`aura_empresa1`, `aura_empresa2`, etc.)
+- **Nivel 3 (Aplicación):** `SchemaManager` gestiona cambio dinámico de conexión según tenant activo
+- **Seguridad:** Un tenant NUNCA puede acceder a datos de otro tenant (separación a nivel schema)
+
+---
+
+## Siguientes Pasos
+
+Una vez que tengas el sistema funcionando:
+
+1. **Personalizar configuración:**
+   - Editar `.env` con tus valores de producción
+   - Configurar dominio real en Nginx si no usas IP
+
+2. **Crear más tenants:**
+   ```bash
+   php create_tenant.php --name="Empresa 2" --codigo="empresa2"
+   ```
+
+3. **Desarrollar funcionalidades:**
+   - Los controladores están en `/core/controllers/`
+   - Las vistas en `/core/vistas/`
+   - Ver [PRD.md](PRD.md) para conocer todas las funcionalidades planificadas
+
+4. **Implementar plugins:**
+   - Directorio `/plugins/` listo para recibir extensiones
+   - Ver `PluginLoader.php` para arquitectura de plugins
+
+---
+
+**¡Instalación completada! 🎉**
+
+Si encuentras problemas, consulta la sección **Troubleshooting** o ejecuta `./diagnostico.sh` para obtener un reporte completo del sistema.
