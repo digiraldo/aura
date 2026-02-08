@@ -184,12 +184,24 @@ sudo systemctl restart nginx
 sudo ss -tlnp | grep 8998
 ```
 
-**Abrir puerto en firewall:**
+**Abrir puerto en firewall (si está activo):**
 
 ```bash
+# Verificar si ufw está instalado
+which ufw
+
+# Si ufw existe, usar:
 sudo ufw allow 8998/tcp
 sudo ufw reload
+
+# Si no existe ufw, verificar con iptables:
+sudo iptables -L -n | grep 8998
+
+# O verificar si usa nftables (Debian moderno):
+sudo nft list ruleset | grep 8998
 ```
+
+**Nota:** En Debian Trixie, el firewall puede no estar activo por defecto. Si estás en una red local confiable, puedes continuar sin configurar el firewall.
 
 ---
 
