@@ -50,6 +50,18 @@ sudo systemctl status mariadb
 
 ### 3. Configurar Seguridad de MariaDB
 
+**IMPORTANTE: Primero verifica si MariaDB ya tiene contraseña configurada**
+
+```bash
+# Probar acceso sin contraseña
+sudo mysql -u root
+
+# Si funciona (entra a MariaDB), usa la Opción A o B
+# Si da error "Access denied", tu MariaDB ya tiene contraseña, usa la Opción C
+```
+
+---
+
 **Opción A: Usar el asistente de seguridad (si está disponible)**
 
 ```bash
@@ -66,10 +78,13 @@ sudo mysql_secure_installation
 - Remove test database? **Y**
 - Reload privilege tables now? **Y**
 
-**Opción B: Configuración manual de seguridad (si el comando no existe)**
+---
+
+**Opción B: Configuración manual de seguridad (si el comando no existe Y no hay contraseña previa)**
 
 ```bash
-sudo mysql
+# Solo si "sudo mysql -u root" funciona sin contraseña
+sudo mysql -u root
 ```
 
 Dentro de MySQL, ejecuta estos comandos:
@@ -93,21 +108,99 @@ FLUSH PRIVILEGES;
 EXIT;
 ```
 
+---
+
+**Opción C: MariaDB ya tiene contraseña configurada (instalación previa)**
+
+Si obtienes **"Access denied"** al intentar `sudo mysql -u root`, significa que ya hay una contraseña.
+
+```bash
+# Intentar con la contraseña que usaste antes
+sudo mysql -u root -pAdmin1234
+
+# Si funciona, salta directamente al paso 4
+```
+
+**Si NO recuerdas la contraseña, resetéala:**
+
+```bash
+# 1. Detener MariaDB
+sudo systemctl stop mariadb
+
+# 2. Iniciar MariaDB en modo seguro (sin contraseña)
+sudo mariadbd-safe --skip-grant-tables --skip-networking &
+
+# 3. Esperar 5 segundos y conectar sin contraseña
+sleep 5
+sudo mysql -u root
+
+# 4. Dentro de MySQL, resetea la contraseña
+FLUSH PRIVILEGES;
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'Admin1234';
+FLUSH PRIVILEGES;
+EXIT;
+
+# 5. Detener el proceso seguro y reiniciar MariaDB normalmente
+sudo pkill mariadbd
+sudo systemctl start mariadb
+
+# 6. Verificar que funciona con la nueva contraseña
+sudo mysql -u root -pAdmin1234 -e "SELECT 1;"
+```
+
+**Salida esperada del último comando:**
+```
++---+
+| 1 |
++---+
+| 1 |
++---+
+```
+
 ### 4. Crear Usuario de Base de Datos
 
 ```bash
-sudo mysql -u root -p
+# Conectar a MySQL con la contraseña
+sudo mysql -u root -pAdmin1234
 ```
 
 Dentro de MySQL, ejecuta:
 
 ```sql
+-- Eliminar usuarios previos si existen (instalación limpia)
+DROP USER IF EXISTS 'aura_admin'@'localhost';
+DROP USER IF EXISTS 'aura_admin'@'%';
+
+-- Crear usuarios nuevos
 CREATE USER 'aura_admin'@'localhost' IDENTIFIED BY 'Admin1234';
 CREATE USER 'aura_admin'@'%' IDENTIFIED BY 'Admin1234';
 GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'localhost' WITH GRANT OPTION;
 GRANT ALL PRIVILEGES ON *.* TO 'aura_admin'@'%' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
+
+-- Verificar que el usuario fue creado
+SELECT User, Host FROM mysql.user WHERE User='aura_admin';
+
 EXIT;
+```
+
+**Verificar la conexión con el nuevo usuario:**
+
+```bash
+# Probar conexión con aura_admin
+mysql -u aura_admin -pAdmin1234 -e "SHOW DATABASES;"
+```
+
+**Salida esperada:**
+```
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
 ```
 
 ### 5. Instalar Nginx y PHP 8.2
