@@ -271,6 +271,26 @@ Abre: `http://192.168.68.20:8998/`
 
 Deberías ver la página de login de phpMyAdmin.
 
+**Si aún persiste el error 502 después de ajustar permisos:**
+
+```bash
+# Verificar que phpMyAdmin está instalado correctamente
+ls -la /usr/share/phpmyadmin/index.php
+
+# Si NO existe, reinstalar phpMyAdmin
+sudo apt install --reinstall phpmyadmin -y
+
+# Verificar logs actualizados
+sudo tail -20 /var/log/nginx/phpmyadmin_error.log
+
+# Verificar que PHP puede ejecutarse
+echo "<?php phpinfo(); ?>" | sudo tee /usr/share/phpmyadmin/test.php
+curl http://localhost:8998/test.php
+
+# Si test.php funciona pero index.php no, puede ser un problema de configuración de phpMyAdmin
+sudo dpkg-reconfigure phpmyadmin
+```
+
 ---
 
 ## Fase 3: Configuración del Proyecto Aura
