@@ -226,40 +226,31 @@ sudo tail -50 /var/log/nginx/phpmyadmin_error.log
 **3. SOLUCIÓN: Ajustar permisos del socket PHP-FPM (Error más común)**
 
 ```bash
-# Ver permisos actuales del socket
-ls -la /var/run/php/php8.2-fpm.sock
+# Verificar configuración actual del pool
+sudo grep -E "^listen|^listen\." /etc/php/8.2/fpm/pool.d/www.conf
 
-# Editar configuración del pool de PHP-FPM
-sudo nano /etc/php/8.2/fpm/pool.d/www.conf
-```
+# Agregar configuración de permisos del socket automáticamente
+sudo bash -c 'cat >> /etc/php/8.2/fpm/pool.d/www.conf << EOF
 
-**Buscar y modificar estas líneas (o agregarlas si no existen):**
-
-```ini
-listen = /var/run/php/php8.2-fpm.sock
+; Configuración de permisos del socket
 listen.owner = www-data
 listen.group = www-data
 listen.mode = 0660
-```
+EOF'
 
-**Guardar:** `Ctrl+O`, `Enter`, `Ctrl+X`
-
-**Aplicar cambios:**
-
-```bash
 # Reiniciar PHP-FPM para aplicar la configuración
 sudo systemctl restart php8.2-fpm
 
-# Reiniciar Nginx
-sudo systemctl restart nginx
-
 # Verificar permisos del socket (debería mostrar www-data:www-data)
 ls -la /var/run/php/php8.2-fpm.sock
+
+# Reiniciar Nginx
+sudo systemctl restart nginx
 ```
 
 **4. Verificar que funciona:**
 ```bash
-# Este comando debería devolver "HTTP/1.1 200 OK" o redireccionamiento, NO 502
+# Este comando debería devolver "HTTP/1.1 200 OK"
 curl -I http://localhost:8998/
 
 # Verificar que el puerto está escuchando
@@ -271,25 +262,9 @@ Abre: `http://192.168.68.20:8998/`
 
 Deberías ver la página de login de phpMyAdmin.
 
-**Si aún persiste el error 502 después de ajustar permisos:**
-
-```bash
-# Verificar que phpMyAdmin está instalado correctamente
-ls -la /usr/share/phpmyadmin/index.php
-
-# Si NO existe, reinstalar phpMyAdmin
-sudo apt install --reinstall phpmyadmin -y
-
-# Verificar logs actualizados
-sudo tail -20 /var/log/nginx/phpmyadmin_error.log
-
-# Verificar que PHP puede ejecutarse
-echo "<?php phpinfo(); ?>" | sudo tee /usr/share/phpmyadmin/test.php
-curl http://localhost:8998/test.php
-
-# Si test.php funciona pero index.php no, puede ser un problema de configuración de phpMyAdmin
-sudo dpkg-reconfigure phpmyadmin
-```
+**Credenciales:**
+- Usuario: `aura_admin`
+- Contraseña: `Admin1234`
 
 ---
 
