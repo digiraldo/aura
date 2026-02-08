@@ -959,9 +959,25 @@ php -m | grep -E "PDO|pdo_mysql|mysqli"
 
 **Error: "Class SchemaManager not found"**
 ```bash
-# Asegurarse de tener la última versión
+# Asegurarse de tener la última versión del repositorio
 cd ~/aura
 git pull origin main
+
+# Si el problema persiste, verificar estructura PSR-4
+ls -la core/lib/Database/SchemaManager.php
+ls -la core/lib/Plugins/PluginLoader.php
+ls -la core/lib/Auth/Auth.php
+```
+
+**Error: "Failed to open stream: No such file or directory" en create_tenant.php**
+```bash
+# Este error indica que create_tenant.php usa rutas antiguas
+# Actualizar desde el repositorio:
+cd ~/aura
+git pull origin main
+
+# Luego volver a ejecutar
+php create_tenant.php empresa_demo
 ```
 
 #### 🔴 Puerto 7474 Bloqueado en Firewall
