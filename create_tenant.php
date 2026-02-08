@@ -85,12 +85,12 @@ $dbDatabase = $env['DB_DATABASE'] ?? 'aura_master';
 $dbUsername = $env['DB_USERNAME'] ?? 'root';
 $dbPassword = $env['DB_PASSWORD'] ?? '';
 
-// Incluir SchemaManager
-require_once __DIR__ . '/core/lib/SchemaManager.php';
+// Incluir SchemaManager (estructura PSR-4)
+require_once __DIR__ . '/core/lib/Database/SchemaManager.php';
 
 // Verificar que la clase existe con el namespace correcto
 if (!class_exists('Aura\\Core\\Database\\SchemaManager')) {
-    die("❌ ERROR: Clase SchemaManager no encontrada.\n   Verifica que el archivo core/lib/SchemaManager.php existe.\n");
+    die("❌ ERROR: Clase SchemaManager no encontrada.\n   Verifica que el archivo core/lib/Database/SchemaManager.php existe.\n");
 }
 
 try {
