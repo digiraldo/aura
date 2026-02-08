@@ -116,28 +116,29 @@ EXIT;
 sudo apt update
 sudo apt install nginx php8.2-fpm php8.2-mysql php8.2-xml php8.2-mbstring php8.2-curl php8.2-zip -y
 
+# Establecer PHP 8.2 como versión por defecto
+sudo update-alternatives --set php /usr/bin/php8.2
+
 # Verificar que las extensiones PHP están instaladas
 php -m | grep -E "pdo|mysql|mysqli"
 
-# Si no aparecen, instalar explícitamente
-sudo apt install php8.2-mysql -y
-sudo systemctl restart php8.2-fpm
+# Verificar versión de PHP
+php --version
 
-# Verificar nuevamente
-php -m | grep -E "PDO|pdo_mysql|mysqli"
+# Si no aparecen las extensiones o hay error "could not find driver":
+php --ini | head -3
+# Debe mostrar: Configuration File (php.ini) Path: /etc/php/8.2/cli
+
+# Si muestra otra versión (8.5, etc.), ejecutar:
+# sudo update-alternatives --set php /usr/bin/php8.2
 ```
 
 **Salida esperada:**
 ```
+PHP 8.2.30 (cli) (built: Dec 18 2025 23:21:10) (NTS)
+mysqli
 PDO
 pdo_mysql
-mysqli
-```
-
-Si no ves estas extensiones, ejecuta:
-```bash
-sudo apt install --reinstall php8.2-mysql -y
-sudo systemctl restart php8.2-fpm
 ```
 
 ### 6. Instalar phpMyAdmin
@@ -453,6 +454,20 @@ tcp   0   0 0.0.0.0:7474   0.0.0.0:*   LISTEN   1234/nginx
 
 ## Fase 5: Finalizar Instalación
 
+**IMPORTANTE: Verificar versión de PHP antes de continuar**
+
+```bash
+# Verificar que estás usando PHP 8.2
+php --version
+
+# Si muestra PHP 8.5 u otra versión:
+sudo update-alternatives --set php /usr/bin/php8.2
+
+# Verificar drivers MySQL disponibles
+php -r "print_r(PDO::getAvailableDrivers());"
+# Debe mostrar: Array ( [0] => mysql )
+```
+
 Ejecutamos los scripts de Aura utilizando el PHP nativo del sistema:
 
 1. **Instalar Base de Datos Master:**
@@ -637,26 +652,49 @@ sudo mysql -u root -p
 
 **Error: "could not find driver" (PDO MySQL)**
 ```bash
-# Verificar extensiones PHP instaladas
-php -m | grep -E "PDO|pdo_mysql|mysqli"
+# Verificar qué versión de PHP está usando el comando 'php'
+php --version
+php --ini | head -3
 
-# Si NO aparecen, instalar/reinstalar php8.2-mysql
+# Si muestra PHP 8.5 u otra versión diferente a 8.2:
+# Verificar versiones instaladas
+ls -la /usr/bin/php*
+
+# Verificar que PHP 8.2 tiene los drivers
+php8.2 -m | grep -E "PDO|pdo_mysql|mysqli"
+
+# Si PHP 8.2 tiene los drivers, establecerlo como versión por defecto
+sudo update-alternatives --set php /usr/bin/php8.2
+
+# Verificar que ahora usa 8.2
+php --version
+
+# Verificar drivers disponibles
+php -r "print_r(PDO::getAvailableDrivers());"
+# Debe mostrar: Array ( [0] => mysql )
+
+# Intentar instalación nuevamente
+cd ~/aura
+php install.php
+```
+
+**Si no hay ninguna versión de PHP con los drivers:**
+```bash
+# Instalar/reinstalar php8.2-mysql
 sudo apt install --reinstall php8.2-mysql -y
+
+# Habilitar extensiones
+sudo phpenmod pdo_mysql
+sudo phpenmod mysqli
 
 # Reiniciar PHP-FPM
 sudo systemctl restart php8.2-fpm
 
-# Verificar nuevamente
+# Establecer PHP 8.2 por defecto
+sudo update-alternatives --set php /usr/bin/php8.2
+
+# Verificar
 php -m | grep -E "PDO|pdo_mysql|mysqli"
-
-# Deberías ver:
-# PDO
-# pdo_mysql
-# mysqli
-
-# Intentar nuevamente la instalación
-cd ~/aura
-php install.php
 ```
 
 **Error: "Class SchemaManager not found"**
@@ -726,6 +764,8 @@ curl -v http://localhost:8998/
 
 Antes de pedir ayuda, verifica:
 
+- [ ] PHP 8.2 está como versión por defecto: `php --version`
+- [ ] Drivers MySQL disponibles: `php -r "print_r(PDO::getAvailableDrivers());"`
 - [ ] MariaDB está corriendo: `sudo systemctl status mariadb`
 - [ ] PHP-FPM está corriendo: `sudo systemctl status php8.2-fpm`
 - [ ] Nginx está corriendo: `sudo systemctl status nginx`
