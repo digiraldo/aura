@@ -446,11 +446,21 @@ cp .env.example .env
 
 # Configurar base de datos
 sed -i 's/DB_HOST=.*/DB_HOST=localhost/g' .env
-sed -i 's/DB_USER=.*/DB_USER=aura_admin/g' .env
+sed -i 's/DB_USERNAME=.*/DB_USERNAME=aura_admin/g' .env
 sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=Admin1234/g' .env
+sed -i 's/DB_DATABASE=.*/DB_DATABASE=aura_master/g' .env
 
 # Verificar la configuración
 cat .env | grep DB_
+```
+
+**Salida esperada:**
+```
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=aura_master
+DB_USERNAME=aura_admin
+DB_PASSWORD=Admin1234
 ```
 
 ### 3. Corregir Errores de Código (IMPORTANTE)
@@ -491,22 +501,32 @@ sed -n '215,230p' public/index.php
 ```
 
 **C. Reorganizar archivos según namespaces PSR-4**
+
+**NOTA:** Los archivos ya deberían estar en su ubicación correcta desde la última versión del repositorio. Verifica primero:
+
+```bash
+# Verificar que los archivos YA están en su lugar
+ls -la core/lib/Database/
+ls -la core/lib/Plugins/
+ls -la core/lib/Auth/
+
+# Si los archivos YA están ahí (SchemaManager.php, PluginLoader.php, Auth.php, Role.php)
+# NO ejecutes los comandos mv, continúa al paso D
+```
+
+**Solo si los archivos NO están en los subdirectorios, ejecuta:**
+
 ```bash
 # Crear directorios para la estructura correcta
 mkdir -p core/lib/Database
 mkdir -p core/lib/Plugins
 mkdir -p core/lib/Auth
 
-# Mover archivos a sus directorios correspondientes
-mv core/lib/SchemaManager.php core/lib/Database/SchemaManager.php
-mv core/lib/PluginLoader.php core/lib/Plugins/PluginLoader.php
-mv core/lib/Auth.php core/lib/Auth/Auth.php
-mv core/lib/Role.php core/lib/Auth/Role.php
-
-# Verificar la estructura
-ls -la core/lib/Database/
-ls -la core/lib/Plugins/
-ls -la core/lib/Auth/
+# Mover archivos a sus directorios correspondientes (solo si aún no lo están)
+mv core/lib/SchemaManager.php core/lib/Database/SchemaManager.php 2>/dev/null || true
+mv core/lib/PluginLoader.php core/lib/Plugins/PluginLoader.php 2>/dev/null || true
+mv core/lib/Auth.php core/lib/Auth/Auth.php 2>/dev/null || true
+mv core/lib/Role.php core/lib/Auth/Role.php 2>/dev/null || true
 ```
 
 **D. Verificar que los cambios funcionan**
@@ -514,18 +534,11 @@ ls -la core/lib/Auth/
 # Probar sintaxis PHP
 php -l public/index.php
 # Debería mostrar: No syntax errors detected
-
-# Probar ejecución
-php public/index.php
-# No debería mostrar errores de clases no encontradas ni "Failed to open stream"
 ```
 
 **Salida esperada:**
 ```
-DB_HOST=localhost
-DB_USER=aura_admin
-DB_PASSWORD=Admin1234
-DB_NAME=aura_master
+No syntax errors detected in public/index.php
 ```
 
 ---
