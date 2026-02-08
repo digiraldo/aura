@@ -23,7 +23,8 @@ final class SchemaManager
     private const SCHEMA_PREFIX = 'tenant_';
     
     public function __construct(
-        private readonly PDO $pdo
+        private readonly PDO $pdo,
+        private readonly PDO|null $pdoMaster = null
     ) {}
 
     /**
@@ -56,6 +57,7 @@ final class SchemaManager
      * Crea un nuevo esquema para un inquilino con estructura base.
      * 
      * Implementa RF-001: Creación de tenant con:
+     * - Registro en tabla master
      * - Esquema MySQL independiente
      * - Tablas base (usuarios, roles, permisos, etc.)
      * - Usuario administrador inicial
@@ -63,10 +65,10 @@ final class SchemaManager
      * 
      * @param string $tenantId Identificador del nuevo inquilino
      * @param array $adminData Datos del usuario administrador inicial
-     * @return bool True si se creó exitosamente
+     * @return int ID del tenant creado
      * @throws PDOException Si falla la creación o migración
      */
-    public function createTenantSchema(string $tenantId, array $adminData = []): bool
+    public function createTenantSchema(string $tenantId, array $adminData = []): int
     {
         $schemaName = $this->generateSchemaName($tenantId);
         
@@ -77,42 +79,62 @@ final class SchemaManager
             );
         }
         
+        $insertedId = null;
+        
         try {
-            // Inicio de transacción atómica para creación
-            $this->pdo->beginTransaction();
+            // 1. Registrar tenant en base de datos master (SI usa transacción)
+            if ($this->pdoMaster) {
+                $this->pdoMaster->beginTransaction();
+                
+                $stmt = $this->pdoMaster->prepare(
+                    "INSERT INTO tenants (nombre, schema_name, estado, metadata) 
+                     VALUES (?, ?, 'activo', JSON_OBJECT('created_by', 'system'))"
+                );
+                $stmt->execute([$tenantId, $schemaName]);
+                $insertedId = (int)$this->pdoMaster->lastInsertId();
+                
+                $this->pdoMaster->commit();
+            }
             
-            // 1. Crear esquema con charset UTF8MB4 (soporte emoji y caracteres especiales)
+            // 2. Crear esquema (DDL - NO transaccional, auto-commit)
             $this->pdo->exec(
                 "CREATE DATABASE `{$schemaName}` 
                 CHARACTER SET utf8mb4 
                 COLLATE utf8mb4_unicode_ci"
             );
             
-            // 2. Cambiar al nuevo esquema
+            // 3. Cambiar al nuevo esquema
             $this->pdo->exec("USE `{$schemaName}`");
             
-            // 3. Ejecutar migraciones base
+            // 4. Ejecutar migraciones base (CREATE TABLE también es auto-commit)
             $this->runBaseMigrations();
             
-            // 4. Crear usuario administrador inicial
+            // 5. Crear usuario administrador inicial
             if (!empty($adminData)) {
                 $this->createAdminUser($adminData);
             }
             
-            // Confirmar transacción
-            $this->pdo->commit();
-            
-            return true;
+            return $insertedId ?? 1;
             
         } catch (PDOException $e) {
-            // Rollback en caso de error
-            $this->pdo->rollBack();
+            // Si falló después de registrar en master, revertir
+            if ($insertedId && $this->pdoMaster && $this->pdoMaster->inTransaction()) {
+                $this->pdoMaster->rollBack();
+            }
+            
+            // Si registro en master fue exitoso pero falló la creación del esquema
+            if ($insertedId && $this->pdoMaster) {
+                try {
+                    $this->pdoMaster->exec("DELETE FROM tenants WHERE id = {$insertedId}");
+                } catch (PDOException $cleanupError) {
+                    error_log("Error limpiando registro de tenant: " . $cleanupError->getMessage());
+                }
+            }
             
             // Intentar limpiar esquema parcialmente creado
             try {
                 $this->pdo->exec("DROP DATABASE IF EXISTS `{$schemaName}`");
             } catch (PDOException $cleanupError) {
-                // Log del error de limpieza pero lanzar el original
                 error_log("Error limpiando esquema fallido: " . $cleanupError->getMessage());
             }
             

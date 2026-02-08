@@ -145,7 +145,7 @@ try {
     echo "🎉 Información del Tenant:\n";
     echo "   ID: {$tenantId}\n";
     echo "   Nombre: {$nombreTenant}\n";
-    echo "   Esquema: tenant_{$tenantId}\n";
+    echo "   Esquema: tenant_{$nombreTenant}\n";
     echo "   Estado: activo\n\n";
     
     echo "👤 Usuario Administrador:\n";
@@ -174,7 +174,7 @@ try {
     echo "⚠️  Importante:\n";
     echo "   - Cambiar la contraseña por defecto\n";
     echo "   - Configurar permisos de usuarios según roles\n";
-    echo "   - Realizar backup periódico del esquema tenant_{$tenantId}\n\n";
+    echo "   - Realizar backup periódico del esquema tenant_{$nombreTenant}\n\n";
     
     echo "¡Listo para usar! 🚀\n";
     
