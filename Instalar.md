@@ -102,14 +102,40 @@ sed -i 's/new Aura\\Core\\SchemaManager/new Aura\\Core\\Database\\SchemaManager/
 
 ## Fase 4: Configuración del Servidor Web (Nginx)
 
-1. **Crear archivo de sitio:**
+### Opción A: Si tienes directorio sites-available (Ubuntu/Debian con configuración estándar)
+
+1. **Verificar si existe el directorio:**
+```bash
+ls -la /etc/nginx/sites-available/
+
+```
+
+Si existe, continúa con estos pasos:
+
 ```bash
 sudo nano /etc/nginx/sites-available/aura
 
 ```
 
+Pega la configuración y luego activa:
 
-2. **Pegar configuración (Virtual Host):**
+```bash
+sudo ln -s /etc/nginx/sites-available/aura /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl restart nginx
+
+```
+
+### Opción B: Si NO existe sites-available (tu caso actual)
+
+Usa el directorio `conf.d` que es el estándar en muchas instalaciones:
+
+1. **Crear archivo directamente en conf.d:**
+```bash
+sudo nano /etc/nginx/conf.d/aura.conf
+
+```
+
+2. **Pegar esta configuración:**
 ```nginx
 server {
     listen 80; # Cambiar a 7484 si se desea mantener ese puerto
@@ -123,7 +149,6 @@ server {
     }
 
     location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
@@ -135,10 +160,10 @@ server {
 
 ```
 
+**Nota:** Si `include snippets/fastcgi-php.conf;` no existe en tu sistema, se usa directamente `include fastcgi_params;`
 
-3. **Activar y Reiniciar:**
+3. **Verificar y Reiniciar:**
 ```bash
-sudo ln -s /etc/nginx/sites-available/aura /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl restart nginx
 
 ```
