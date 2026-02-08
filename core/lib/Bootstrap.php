@@ -70,7 +70,7 @@ final class Bootstrap
      */
     private function loadConfiguration(): void
     {
-        $configPath = __DIR__ . '/config/';
+        $configPath = __DIR__ . '/../config/';
         
         $this->config = array_merge(
             require $configPath . 'app.php',
