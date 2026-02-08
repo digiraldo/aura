@@ -43,6 +43,10 @@ Aura es una plataforma que redefine la gestión empresarial mediante:
 ```bash
 git clone https://github.com/tu-usuario/aura.git
 cd aura
+
+
+
+git clone https://github.com/digiraldo/aura.git
 ```
 
 ### 2. Configurar Variables de Entorno

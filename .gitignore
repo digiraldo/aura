@@ -1,0 +1,47 @@
+# Variables de entorno
+.env
+
+# Directorios de almacenamiento (mantener solo estructura)
+storage/*
+!storage/.gitignore
+!storage/logs/.gitkeep
+!storage/cache/.gitkeep
+!storage/uploads/.gitkeep
+!storage/sessions/.gitkeep
+
+# Plugins de terceros (mantener solo README)
+plugins/*
+!plugins/.gitkeep
+!plugins/README.md
+
+# Composer
+/vendor/
+composer.lock
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Caché
+*.cache
+
+# Backups
+*.bak
+*.backup
+*.sql
+
+# Node (si se usa en el futuro)
+node_modules/
+package-lock.json
