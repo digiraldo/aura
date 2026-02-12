@@ -38,6 +38,7 @@ echo ""
 # ============================================================================
 
 echo -e "${CYAN}═══ PASO 1: Configuración de Credenciales ═══${NC}"
+sudo rm -rf uninstall.sh
 echo ""
 
 # Contraseña de MySQL root
@@ -284,18 +285,24 @@ cat > /tmp/create_custom_tenant.php <<'EOPHP'
 declare(strict_types=1);
 
 // Obtener argumentos
-$tenantName = $argv[1] ?? null;
-$adminUsername = $argv[2] ?? 'admin';
-$adminPassword = $argv[3] ?? 'admin123';
-$adminEmail = $argv[4] ?? 'admin@empresa.local';
+$projectPath = $argv[1] ?? null;
+$tenantName = $argv[2] ?? null;
+$adminUsername = $argv[3] ?? 'admin';
+$adminPassword = $argv[4] ?? 'admin123';
+$adminEmail = $argv[5] ?? 'admin@empresa.local';
 
-if (!$tenantName) {
-    die("ERROR: Nombre del tenant requerido\n");
+if (!$projectPath || !$tenantName) {
+    die("ERROR: Ruta del proyecto y nombre del tenant requeridos\n");
 }
 
 // Cargar .env
 $env = [];
-$envLines = file(__DIR__ . '/aura/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+$envFile = $projectPath . '/.env';
+if (!file_exists($envFile)) {
+    die("ERROR: Archivo .env no encontrado en: $envFile\n");
+}
+
+$envLines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 foreach ($envLines as $line) {
     $line = trim($line);
     if (empty($line) || str_starts_with($line, '#')) continue;
@@ -310,7 +317,11 @@ $dbUsername = $env['DB_USERNAME'] ?? 'root';
 $dbPassword = $env['DB_PASSWORD'] ?? '';
 
 // Incluir SchemaManager
-require_once __DIR__ . '/aura/core/lib/Database/SchemaManager.php';
+$schemaManagerPath = $projectPath . '/core/lib/Database/SchemaManager.php';
+if (!file_exists($schemaManagerPath)) {
+    die("ERROR: SchemaManager no encontrado en: $schemaManagerPath\n");
+}
+require_once $schemaManagerPath;
 
 try {
     // Conectar a master
@@ -355,8 +366,8 @@ try {
 }
 EOPHP
 
-# Ejecutar script de creación de tenant
-php /tmp/create_custom_tenant.php "$TENANT_NAME" "$ADMIN_USERNAME" "$ADMIN_PASSWORD" "$ADMIN_EMAIL"
+# Ejecutar script de creación de tenant con la ruta del proyecto
+php /tmp/create_custom_tenant.php "$HOME/aura" "$TENANT_NAME" "$ADMIN_USERNAME" "$ADMIN_PASSWORD" "$ADMIN_EMAIL"
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Tenant '$TENANT_NAME' creado exitosamente${NC}"
@@ -560,3 +571,4 @@ echo "4. Inicia sesión con las credenciales mostradas arriba"
 echo ""
 echo -e "${GREEN}🎉 ¡Disfruta de Aura Platform!${NC}"
 echo ""
+sudo rm -rf install.sh

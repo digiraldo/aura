@@ -150,6 +150,8 @@ if [ "$DELETE_DIR" = "s" ] || [ "$DELETE_DIR" = "S" ]; then
         chmod +x ~/uninstall.sh
         echo -e "${BLUE}   📋 uninstall.sh copiado a ~/uninstall.sh${NC}"
     fi
+    # Cambiar al directorio home antes de eliminar
+    cd ~ 2>/dev/null || true
     rm -rf ~/aura
     echo -e "${GREEN}   ✅ Directorio ~/aura eliminado${NC}"
 else
@@ -185,3 +187,7 @@ else
     echo -e "${YELLOW}💡 Para reinstalar Aura Platform, ejecuta: ~/aura/install.sh${NC}"
 fi
 echo ""
+
+
+# Cambiar al directorio home para salir del directorio del proyecto
+cd ~ 2>/dev/null || true
