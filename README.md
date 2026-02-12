@@ -455,4 +455,18 @@ cd aura
 
 sudo systemctl restart php8.2-fpm
 sudo systemctl restart nginx
+
+
+
+cd ~/aura
+chmod +x fix_broken_packages.sh
+./fix_broken_packages.sh
 ```
+
+Este script: fix_broken_packages.sh
+
+✅ Detecta paquetes LiteSpeed problemáticos (php8.4-litespeed, etc.)
+✅ Los elimina de forma forzada
+✅ Configura paquetes pendientes (dpkg --configure -a)
+✅ Corrige dependencias rotas (apt-get install -f)
+✅ Limpia paquetes huérfanos y caché
