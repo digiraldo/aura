@@ -4,7 +4,7 @@
 # AURA PLATFORM - SCRIPT DE INSTALACIÓN AUTOMÁTICA
 # 
 # Este script instala Aura Platform desde cero:
-# - Instala y configura phpMyAdmin
+# - Opcionalmente instala phpMyAdmin (método manual, sin apt)
 # - Crea las bases de datos necesarias
 # - Configura el usuario de base de datos
 # - Ejecuta las migraciones
@@ -246,42 +246,78 @@ echo ""
 echo -e "${CYAN}═══ PASO 5: Instalando phpMyAdmin ═══${NC}"
 echo ""
 
-# Verificar si phpMyAdmin ya está instalado
-if dpkg -l | grep -q phpmyadmin; then
-    echo -e "${YELLOW}⚠️  phpMyAdmin ya está instalado${NC}"
+# Preguntar si desea instalar phpMyAdmin
+read -p "¿Deseas instalar phpMyAdmin? (s/n): " INSTALL_PHPMYADMIN
+echo ""
+
+if [ "$INSTALL_PHPMYADMIN" != "s" ] && [ "$INSTALL_PHPMYADMIN" != "S" ]; then
+    echo -e "${YELLOW}⏭️  Instalación de phpMyAdmin omitida${NC}"
+    PHPMYADMIN_INSTALLED="no"
 else
-    echo "🔧 Instalando phpMyAdmin..."
-    
-    # Configurar instalación no interactiva
-    export DEBIAN_FRONTEND=noninteractive
-    
-    # Pre-configurar phpMyAdmin
-    echo "phpmyadmin phpmyadmin/dbconfig-install boolean true" | sudo debconf-set-selections
-    echo "phpmyadmin phpmyadmin/app-password-confirm password Admin1234" | sudo debconf-set-selections
-    echo "phpmyadmin phpmyadmin/mysql/admin-pass password ${MYSQL_ROOT_PASSWORD}" | sudo debconf-set-selections
-    echo "phpmyadmin phpmyadmin/mysql/app-pass password Admin1234" | sudo debconf-set-selections
-    echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect" | sudo debconf-set-selections
-    
-    # Instalar phpMyAdmin
-    sudo apt-get update -qq
-    sudo apt-get install -y phpmyadmin php-mbstring php-zip php-gd php-json php-curl
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ phpMyAdmin instalado${NC}"
+    # Verificar si phpMyAdmin ya está instalado
+    if [ -d "/usr/share/phpmyadmin" ] && [ -f "/usr/share/phpmyadmin/index.php" ]; then
+        echo -e "${YELLOW}⚠️  phpMyAdmin ya está instalado${NC}"
+        PHPMYADMIN_INSTALLED="yes"
     else
-        echo -e "${RED}❌ ERROR al instalar phpMyAdmin${NC}"
-        exit 1
+        echo "🔧 Instalando phpMyAdmin (método manual)..."
+        
+        # Instalar dependencias PHP necesarias
+        echo "📦 Instalando extensiones PHP necesarias..."
+        sudo apt-get update -qq
+        sudo apt-get install -y wget unzip php-mbstring php-zip php-gd php-json php-curl -qq
+        
+        # Descargar phpMyAdmin
+        PHPMYADMIN_VERSION="5.2.1"
+        PHPMYADMIN_URL="https://files.phpmyadmin.net/phpMyAdmin/${PHPMYADMIN_VERSION}/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages.zip"
+        
+        echo "⬇️  Descargando phpMyAdmin ${PHPMYADMIN_VERSION}..."
+        cd /tmp
+        wget -q --show-progress "${PHPMYADMIN_URL}" -O phpmyadmin.zip
+        
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}❌ ERROR al descargar phpMyAdmin${NC}"
+            echo -e "${YELLOW}   Puedes instalarlo manualmente más tarde${NC}"
+            PHPMYADMIN_INSTALLED="no"
+        else
+            # Extraer y mover a /usr/share
+            echo "📂 Extrayendo phpMyAdmin..."
+            sudo unzip -q phpmyadmin.zip
+            sudo rm -rf /usr/share/phpmyadmin
+            sudo mv "phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages" /usr/share/phpmyadmin
+            
+            # Crear directorio de configuración
+            sudo mkdir -p /usr/share/phpmyadmin/tmp
+            sudo chown -R www-data:www-data /usr/share/phpmyadmin/tmp
+            sudo chmod 777 /usr/share/phpmyadmin/tmp
+            
+            # Crear archivo de configuración
+            sudo cp /usr/share/phpmyadmin/config.sample.inc.php /usr/share/phpmyadmin/config.inc.php
+            
+            # Generar blowfish_secret
+            BLOWFISH_SECRET=$(openssl rand -base64 32)
+            sudo sed -i "s/\$cfg\['blowfish_secret'\] = '';/\$cfg['blowfish_secret'] = '${BLOWFISH_SECRET}';/" /usr/share/phpmyadmin/config.inc.php
+            
+            # Configurar TempDir
+            echo "\$cfg['TempDir'] = '/usr/share/phpmyadmin/tmp';" | sudo tee -a /usr/share/phpmyadmin/config.inc.php > /dev/null
+            
+            # Limpiar archivos temporales
+            rm -f phpmyadmin.zip
+            
+            echo -e "${GREEN}✅ phpMyAdmin instalado manualmente${NC}"
+            PHPMYADMIN_INSTALLED="yes"
+        fi
     fi
 fi
 
-# Configurar Nginx para phpMyAdmin en puerto 8998
-echo ""
-echo "🔧 Configurando Nginx para phpMyAdmin..."
+# Configurar Nginx para phpMyAdmin en puerto 8998 (solo si se instaló)
+if [ "$PHPMYADMIN_INSTALLED" = "yes" ]; then
+    echo ""
+    echo "🔧 Configurando Nginx para phpMyAdmin..."
 
-if [ -f "/etc/nginx/conf.d/phpmyadmin.conf" ]; then
-    echo -e "${YELLOW}⚠️  Configuración de phpMyAdmin ya existe${NC}"
-else
-    sudo tee /etc/nginx/conf.d/phpmyadmin.conf > /dev/null <<'PHPMYADMIN_CONF'
+    if [ -f "/etc/nginx/conf.d/phpmyadmin.conf" ]; then
+        echo -e "${YELLOW}⚠️  Configuración de phpMyAdmin ya existe${NC}"
+    else
+        sudo tee /etc/nginx/conf.d/phpmyadmin.conf > /dev/null <<'PHPMYADMIN_CONF'
 server {
     listen 8998;
     server_name _;
@@ -313,29 +349,30 @@ server {
     access_log /var/log/nginx/phpmyadmin_access.log;
 }
 PHPMYADMIN_CONF
-    
-    echo -e "${GREEN}✅ Configuración de Nginx para phpMyAdmin creada${NC}"
+        
+        echo -e "${GREEN}✅ Configuración de Nginx para phpMyAdmin creada${NC}"
+    fi
+
+    # Probar configuración de Nginx
+    echo ""
+    echo "🔧 Verificando configuración de Nginx..."
+    sudo nginx -t
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ Configuración de Nginx válida${NC}"
+        sudo systemctl reload nginx
+        echo -e "${GREEN}✅ Nginx recargado${NC}"
+    else
+        echo -e "${RED}❌ ERROR en la configuración de Nginx${NC}"
+        exit 1
+    fi
+
+    echo ""
+    echo -e "${GREEN}✅ phpMyAdmin instalado y configurado${NC}"
+    echo -e "${BLUE}   Acceso: http://${SERVER_IP}:8998/${NC}"
+    echo -e "${BLUE}   Usuario: aura_admin (o root)${NC}"
+    echo -e "${BLUE}   Contraseña: Admin1234 (o la de root)${NC}"
 fi
-
-# Probar configuración de Nginx
-echo ""
-echo "🔧 Verificando configuración de Nginx..."
-sudo nginx -t
-
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Configuración de Nginx válida${NC}"
-    sudo systemctl reload nginx
-    echo -e "${GREEN}✅ Nginx recargado${NC}"
-else
-    echo -e "${RED}❌ ERROR en la configuración de Nginx${NC}"
-    exit 1
-fi
-
-echo ""
-echo -e "${GREEN}✅ phpMyAdmin instalado y configurado${NC}"
-echo -e "${BLUE}   Acceso: http://${SERVER_IP}:8998/${NC}"
-echo -e "${BLUE}   Usuario: aura_admin${NC}"
-echo -e "${BLUE}   Contraseña: Admin1234${NC}"
 
 # ============================================================================
 # PASO 6: EJECUTAR INSTALACIÓN DE AURA
@@ -652,11 +689,13 @@ echo "   Tenant: tenant_${TENANT_NAME}"
 echo "   Usuario DB: aura_admin"
 echo "   Contraseña DB: Admin1234"
 echo ""
-echo -e "${BLUE}🛠️  phpMyAdmin:${NC}"
-echo "   URL: http://${SERVER_IP}:8998/"
-echo "   Usuario: aura_admin"
-echo "   Contraseña: Admin1234"
-echo ""
+if [ "$PHPMYADMIN_INSTALLED" = "yes" ]; then
+    echo -e "${BLUE}🛠️  phpMyAdmin:${NC}"
+    echo "   URL: http://${SERVER_IP}:8998/"
+    echo "   Usuario: aura_admin (o root)"
+    echo "   Contraseña: Admin1234 (o la de root)"
+    echo ""
+fi
 echo -e "${YELLOW}📝 Próximos pasos:${NC}"
 echo ""
 echo "1. En tu PC Windows, configura el archivo hosts:"

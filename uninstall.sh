@@ -162,12 +162,24 @@ fi
 
 # 7. Desinstalar phpMyAdmin (opcional)
 echo ""
-read -p "¿Deseas desinstalar phpMyAdmin? (s/n): " UNINSTALL_PHPMYADMIN
+read -p "¿Deseas eliminar phpMyAdmin? (s/n): " UNINSTALL_PHPMYADMIN
 if [ "$UNINSTALL_PHPMYADMIN" = "s" ] || [ "$UNINSTALL_PHPMYADMIN" = "S" ]; then
-    echo "7️⃣  Desinstalando phpMyAdmin..."
-    sudo apt-get remove --purge -y phpmyadmin 2>/dev/null || true
-    sudo apt-get autoremove -y 2>/dev/null || true
-    echo -e "${GREEN}   ✅ phpMyAdmin desinstalado${NC}"
+    echo "7️⃣  Eliminando phpMyAdmin..."
+    
+    # Eliminar instalación via apt (si existe)
+    if dpkg -l | grep -q phpmyadmin 2>/dev/null; then
+        sudo apt-get remove --purge -y phpmyadmin 2>/dev/null || true
+        sudo apt-get autoremove -y 2>/dev/null || true
+        echo -e "${GREEN}   ✅ phpMyAdmin (apt) desinstalado${NC}"
+    fi
+    
+    # Eliminar instalación manual (si existe)
+    if [ -d "/usr/share/phpmyadmin" ]; then
+        sudo rm -rf /usr/share/phpmyadmin
+        echo -e "${GREEN}   ✅ phpMyAdmin (manual) eliminado${NC}"
+    fi
+    
+    echo -e "${GREEN}   ✅ phpMyAdmin eliminado completamente${NC}"
 else
     echo -e "${YELLOW}   ⚠️  phpMyAdmin conservado${NC}"
 fi
