@@ -119,6 +119,17 @@ echo -e "${GREEN}   ✅ Archivos de sesión limpiados${NC}"
 echo ""
 read -p "¿Deseas eliminar el directorio ~/aura completamente? (s/n): " DELETE_DIR
 if [ "$DELETE_DIR" = "s" ] || [ "$DELETE_DIR" = "S" ]; then
+    # Copiar scripts al home antes de eliminar el directorio
+    if [ -f ~/aura/install.sh ]; then
+        cp ~/aura/install.sh ~/install.sh
+        chmod +x ~/install.sh
+        echo -e "${BLUE}   📋 install.sh copiado a ~/install.sh${NC}"
+    fi
+    if [ -f ~/aura/uninstall.sh ]; then
+        cp ~/aura/uninstall.sh ~/uninstall.sh
+        chmod +x ~/uninstall.sh
+        echo -e "${BLUE}   📋 uninstall.sh copiado a ~/uninstall.sh${NC}"
+    fi
     rm -rf ~/aura
     echo -e "${GREEN}   ✅ Directorio ~/aura eliminado${NC}"
 else
@@ -144,7 +155,13 @@ echo "   - Configuraciones de Nginx eliminadas"
 echo "   - Logs limpiados"
 if [ "$DELETE_DIR" = "s" ] || [ "$DELETE_DIR" = "S" ]; then
     echo "   - Directorio del proyecto eliminado"
+    echo "   - Scripts copiados a ~/install.sh y ~/uninstall.sh"
 fi
 echo ""
-echo -e "${YELLOW}💡 Ahora puedes ejecutar ./install.sh para reinstalar Aura Platform${NC}"
+if [ "$DELETE_DIR" = "s" ] || [ "$DELETE_DIR" = "S" ]; then
+    echo -e "${YELLOW}💡 Para reinstalar Aura Platform, ejecuta: ~/install.sh${NC}"
+    echo -e "${YELLOW}💡 Scripts disponibles en: ~/install.sh y ~/uninstall.sh${NC}"
+else
+    echo -e "${YELLOW}💡 Para reinstalar Aura Platform, ejecuta: ~/aura/install.sh${NC}"
+fi
 echo ""

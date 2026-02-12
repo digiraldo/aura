@@ -480,6 +480,7 @@ Deberías ver la página de login de phpMyAdmin.
 ```bash
 cd ~
 git clone https://github.com/digiraldo/aura.git
+git clone https://raw.githubusercontent.com/digiraldo/aura/refs/heads/main/install.sh
 cd aura
 ```
 
