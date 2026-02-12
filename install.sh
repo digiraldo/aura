@@ -125,16 +125,54 @@ echo ""
 echo -e "${CYAN}═══ PASO 2: Verificando estructura del proyecto ═══${NC}"
 echo ""
 
+# Verificar si existe el directorio, si no, clonarlo
+if [ ! -d ~/aura ]; then
+    echo -e "${YELLOW}📦 Directorio ~/aura no encontrado. Clonando repositorio...${NC}"
+    
+    # Verificar si git está instalado
+    if ! command -v git &> /dev/null; then
+        echo -e "${RED}❌ ERROR: Git no está instalado.${NC}"
+        echo "   Instala git primero: sudo apt install git -y"
+        exit 1
+    fi
+    
+    # Clonar el repositorio
+    cd ~ || exit 1
+    git clone https://github.com/digiraldo/aura.git ~/aura
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌ ERROR: No se pudo clonar el repositorio${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✅ Repositorio clonado exitosamente${NC}"
+    
+    # Actualizar scripts en el home si este script está en ~/install.sh
+    SCRIPT_PATH="$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+    if [[ "$SCRIPT_PATH" == "$HOME/install.sh" ]] && [ -f ~/aura/install.sh ]; then
+        echo -e "${BLUE}📋 Actualizando script de instalación...${NC}"
+        cp ~/aura/install.sh ~/install.sh
+        chmod +x ~/install.sh
+        if [ -f ~/aura/uninstall.sh ]; then
+            cp ~/aura/uninstall.sh ~/uninstall.sh
+            chmod +x ~/uninstall.sh
+        fi
+        echo -e "${GREEN}✅ Scripts actualizados en ~/install.sh y ~/uninstall.sh${NC}"
+    fi
+    echo ""
+fi
+
+# Cambiar al directorio del proyecto
 cd ~/aura || {
-    echo -e "${RED}❌ ERROR: Directorio ~/aura no encontrado.${NC}"
-    echo "   Por favor, clona el proyecto primero:"
-    echo "   git clone https://github.com/digiraldo/aura.git ~/aura"
+    echo -e "${RED}❌ ERROR: No se pudo acceder al directorio ~/aura${NC}"
     exit 1
 }
 
 # Verificar archivos clave
 if [ ! -f "install.php" ]; then
     echo -e "${RED}❌ ERROR: Archivo install.php no encontrado${NC}"
+    echo "   El repositorio puede estar incompleto. Intenta:"
+    echo "   rm -rf ~/aura && git clone https://github.com/digiraldo/aura.git ~/aura"
     exit 1
 fi
 

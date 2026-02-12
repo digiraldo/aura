@@ -19,6 +19,7 @@ mysql -u root -pAdmin1234 -e "DROP DATABASE IF EXISTS aura_master;" 2>/dev/null 
 mysql -u aura_admin -pAdmin1234 -e "DROP DATABASE IF EXISTS tenant_empresa_demo;" 2>/dev/null || true
 ```
 
+
 ---
 
 ### Opción B: Limpieza Total (Reinstalación Completa)

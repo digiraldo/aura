@@ -425,3 +425,21 @@ Para preguntas o soporte:
 ---
 
 *Versión del documento: 1.0 | Última actualización: 2 de febrero de 2026*
+
+
+```bash
+# Eliminar directorio del proyecto si existe
+cd ~
+rm -rf ~/aura
+
+# Si ya tienes MariaDB instalado con contraseña, limpiar bases de datos previas
+# (Si no tienes MariaDB aún, omite este paso)
+mysql -u root -pAdmin1234 -e "DROP DATABASE IF EXISTS aura_master;" 2>/dev/null || true
+mysql -u aura_admin -pAdmin1234 -e "DROP DATABASE IF EXISTS tenant_empresa_demo;" 2>/dev/null || true
+```
+
+```bash
+cd ~
+git clone https://github.com/digiraldo/aura.git
+cd aura
+```

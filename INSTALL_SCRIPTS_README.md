@@ -11,7 +11,8 @@ Antes de ejecutar los scripts, asegúrate de tener instalado:
 - ✅ PHP 8.2 con extensiones: `php8.2-fpm`, `php8.2-mysql`, `php8.2-xml`, `php8.2-mbstring`, `php8.2-curl`, `php8.2-zip`
 - ✅ MariaDB Server
 - ✅ Git
-- ✅ Proyecto clonado en `~/aura`
+
+**Nota:** Ya **NO necesitas** clonar el proyecto manualmente. El script `install.sh` lo clonará automáticamente si no existe.
 
 Si aún no tienes el stack instalado, sigue la **Fase 2** del archivo `Instalar.md`.
 
@@ -32,6 +33,7 @@ chmod +x uninstall.sh
 El script te pedirá:
 - Contraseña de MySQL root
 - Confirmación escribiendo `SI ELIMINAR`
+- Si deseas eliminar el directorio `~/aura` completamente
 
 Esto eliminará:
 - ✅ Todas las bases de datos (aura_master, tenant_*)
@@ -39,12 +41,20 @@ Esto eliminará:
 - ✅ Configuraciones de Nginx
 - ✅ Logs de la aplicación
 
+**💡 Importante:** Si eliges eliminar el directorio `~/aura`, el script copiará automáticamente `install.sh` y `uninstall.sh` a tu directorio home (`~/`).
+
 ### Paso 2: Instalar versión limpia
 
+Después de desinstalar, ejecuta:
+
 ```bash
-chmod +x install.sh
-./install.sh
+~/install.sh
 ```
+
+**El script automáticamente:**
+- 🔄 Clonará el repositorio en `~/aura` si no existe
+- 📋 Actualizará los scripts en `~/install.sh` y `~/uninstall.sh`
+- ▶️ Iniciará el proceso de instalación interactivo
 
 El script te preguntará de forma interactiva:
 
@@ -70,15 +80,62 @@ El script realizará automáticamente:
 
 ## 🎯 Primera Instalación
 
-Si es tu primera vez instalando Aura Platform:
+Si es tu primera vez instalando Aura Platform, tienes dos opciones:
+
+### Opción A: Usando el script directamente (Recomendado)
+
+Descarga y ejecuta el script:
 
 ```bash
+cd ~
+wget https://raw.githubusercontent.com/digiraldo/aura/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+El script **clonará automáticamente** el repositorio si no existe en `~/aura`.
+
+### Opción B: Clonando el repositorio primero
+
+```bash
+cd ~
+git clone https://github.com/digiraldo/aura.git
 cd ~/aura
 chmod +x install.sh
 ./install.sh
 ```
 
-Sigue las instrucciones interactivas del script.
+Ambas opciones te guiarán con instrucciones interactivas.
+
+---
+
+## 📦 Flujo de Trabajo: Desinstalación → Reinstalación
+
+Cuando ejecutas `uninstall.sh` y eliminas el directorio `~/aura`, el proceso es el siguiente:
+
+1. **Desinstalación** (`./uninstall.sh`):
+   ```bash
+   cd ~/aura
+   ./uninstall.sh
+   # Elige "s" para eliminar el directorio completamente
+   ```
+   
+   Resultado:
+   - 🗑️ Directorio `~/aura` eliminado
+   - 📋 Scripts copiados a `~/install.sh` y `~/uninstall.sh`
+
+2. **Reinstalación** (`~/install.sh`):
+   ```bash
+   ~/install.sh
+   ```
+   
+   El script automáticamente:
+   - 🔍 Detecta que `~/aura` no existe
+   - 📥 Clona el repositorio: `git clone https://github.com/digiraldo/aura.git ~/aura`
+   - 🔄 Actualiza los scripts en `~/` con las versiones del repositorio
+   - ▶️ Continúa con la instalación normal
+
+**💡 Ventaja:** Siempre obtendrás la versión más reciente del código al reinstalar.
 
 ---
 
