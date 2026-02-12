@@ -218,6 +218,26 @@ final class Bootstrap
             session_regenerate_id(true);
             $_SESSION['last_regeneration'] = time();
         }
+
+        // Reconstruir Auth desde sesión si existe
+        if (isset($_SESSION['user_id']) && isset($_SESSION['role']) && $this->auth === null) {
+            try {
+                $this->auth = Auth::fromSession(
+                    $this->pdo,
+                    (int)$_SESSION['user_id'],
+                    $_SESSION['role']
+                );
+                
+                // Si el usuario ya no existe o está desactivado, limpiar sesión
+                if ($this->auth === null) {
+                    unset($_SESSION['user_id'], $_SESSION['role']);
+                }
+            } catch (\Exception $e) {
+                error_log("Error reconstruyendo Auth desde sesión: " . $e->getMessage());
+                unset($_SESSION['user_id'], $_SESSION['role']);
+                $this->auth = null;
+            }
+        }
     }
 
     /**

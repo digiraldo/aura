@@ -202,6 +202,41 @@ final class Auth
     }
 
     /**
+     * Reconstruye instancia de Auth desde datos de sesión.
+     * 
+     * @param PDO $pdo Conexión a la base de datos del tenant
+     * @param int $userId ID del usuario desde $_SESSION
+     * @param string $roleName Nombre del rol desde $_SESSION
+     * @return self|null Instancia de Auth si el usuario existe y está activo
+     */
+    public static function fromSession(PDO $pdo, int $userId, string $roleName): ?self
+    {
+        // Verificar que el usuario sigue existiendo y activo
+        $stmt = $pdo->prepare("
+            SELECT 
+                u.id,
+                u.rol_id,
+                u.activo
+            FROM usuarios u
+            WHERE u.id = :id
+            LIMIT 1
+        ");
+        
+        $stmt->execute(['id' => $userId]);
+        $user = $stmt->fetch();
+
+        if (!$user || !$user['activo']) {
+            // Usuario no existe o está desactivado
+            return null;
+        }
+
+        // Reconstruir rol
+        $role = Role::fromId((int)$user['rol_id']);
+        
+        return new self($pdo, (int)$user['id'], $role);
+    }
+
+    /**
      * Verifica las credenciales de un usuario y retorna instancia de Auth.
      * 
      * @param PDO $pdo Conexión a la base de datos del tenant
