@@ -179,6 +179,23 @@ if [ "$UNINSTALL_PHPMYADMIN" = "s" ] || [ "$UNINSTALL_PHPMYADMIN" = "S" ]; then
         echo -e "${GREEN}   ✅ phpMyAdmin (manual) eliminado${NC}"
     fi
     
+    # Limpiar paquetes rotos relacionados con PHP
+    echo "🧹 Limpiando paquetes rotos..."
+    sudo dpkg --configure -a 2>/dev/null || true
+    
+    # Eliminar paquetes problemáticos de PHP que no se necesitan
+    BROKEN_PACKAGES=$(dpkg -l | grep -E "php.*litespeed" | awk '{print $2}' 2>/dev/null || true)
+    if [ ! -z "$BROKEN_PACKAGES" ]; then
+        echo "   Eliminando paquetes LiteSpeed innecesarios..."
+        for pkg in $BROKEN_PACKAGES; do
+            sudo apt-get remove --purge -y "$pkg" 2>/dev/null || true
+            sudo dpkg --remove --force-remove-reinstreq "$pkg" 2>/dev/null || true
+        done
+    fi
+    
+    sudo apt-get autoremove -y 2>/dev/null || true
+    sudo apt-get clean 2>/dev/null || true
+    
     echo -e "${GREEN}   ✅ phpMyAdmin eliminado completamente${NC}"
 else
     echo -e "${YELLOW}   ⚠️  phpMyAdmin conservado${NC}"

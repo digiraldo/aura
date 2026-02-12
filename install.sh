@@ -254,6 +254,21 @@ if [ "$INSTALL_PHPMYADMIN" != "s" ] && [ "$INSTALL_PHPMYADMIN" != "S" ]; then
     echo -e "${YELLOW}⏭️  Instalación de phpMyAdmin omitida${NC}"
     PHPMYADMIN_INSTALLED="no"
 else
+    # Limpiar paquetes rotos antes de instalar
+    echo "🧹 Verificando estado de paquetes..."
+    sudo dpkg --configure -a 2>/dev/null || true
+    
+    # Eliminar paquetes LiteSpeed problemáticos si existen
+    LITESPEED_PACKAGES=$(dpkg -l | grep -E "php.*litespeed" | awk '{print $2}' 2>/dev/null || true)
+    if [ ! -z "$LITESPEED_PACKAGES" ]; then
+        echo "   Eliminando paquetes LiteSpeed conflictivos..."
+        for pkg in $LITESPEED_PACKAGES; do
+            sudo apt-get remove --purge -y "$pkg" 2>/dev/null || true
+            sudo dpkg --remove --force-remove-reinstreq "$pkg" 2>/dev/null || true
+        done
+        sudo apt-get autoremove -y 2>/dev/null || true
+    fi
+    
     # Verificar si phpMyAdmin ya está instalado
     if [ -d "/usr/share/phpmyadmin" ] && [ -f "/usr/share/phpmyadmin/index.php" ]; then
         echo -e "${YELLOW}⚠️  phpMyAdmin ya está instalado${NC}"
