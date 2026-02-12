@@ -318,6 +318,12 @@ else
             # Limpiar archivos temporales
             rm -f phpmyadmin.zip
             
+            # Volver al directorio del proyecto
+            cd ~/aura || {
+                echo -e "${RED}❌ ERROR: No se pudo volver al directorio ~/aura${NC}"
+                exit 1
+            }
+            
             echo -e "${GREEN}✅ phpMyAdmin instalado manualmente${NC}"
             PHPMYADMIN_INSTALLED="yes"
         fi
@@ -396,6 +402,12 @@ fi
 echo ""
 echo -e "${CYAN}═══ PASO 6: Instalando base de datos master ═══${NC}"
 echo ""
+
+# Asegurarse de estar en el directorio correcto
+cd ~/aura || {
+    echo -e "${RED}❌ ERROR: No se pudo acceder al directorio ~/aura${NC}"
+    exit 1
+}
 
 php install.php
 
