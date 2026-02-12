@@ -13,8 +13,6 @@
 # ⚠️  ADVERTENCIA: Esta acción es IRREVERSIBLE
 ###############################################################################
 
-set -e  # Salir si hay errores
-
 # Colores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -71,14 +69,25 @@ echo ""
 echo "2️⃣  Eliminando bases de datos..."
 
 # Obtener lista de bases de datos tenant
-TENANT_DBS=$(mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -Nse "SHOW DATABASES LIKE 'tenant_%';")
+TENANT_DBS=$(mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -Nse "SHOW DATABASES LIKE 'tenant_%';" 2>/dev/null || true)
 
-mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<EOF
+# Construir comandos DROP para tenants solo si existen
+TENANT_DROP_COMMANDS=""
+if [ ! -z "$TENANT_DBS" ]; then
+    TENANT_DROP_COMMANDS=$(echo "$TENANT_DBS" | while IFS= read -r db; do 
+        if [ ! -z "$db" ]; then
+            echo "DROP DATABASE IF EXISTS \`$db\`;"
+        fi
+    done)
+fi
+
+# Ejecutar eliminación de bases de datos
+mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<EOF 2>/dev/null || true
 -- Eliminar base de datos master
 DROP DATABASE IF EXISTS aura_master;
 
 -- Eliminar bases de datos de tenants
-$(echo "$TENANT_DBS" | while read db; do echo "DROP DATABASE IF EXISTS \`$db\`;"; done)
+$TENANT_DROP_COMMANDS
 
 -- Eliminar usuario aura_admin
 DROP USER IF EXISTS 'aura_admin'@'localhost';
@@ -87,8 +96,19 @@ DROP USER IF EXISTS 'aura_admin'@'%';
 FLUSH PRIVILEGES;
 EOF
 
-echo -e "${GREEN}   ✅ Base de datos 'aura_master' eliminada${NC}"
-echo -e "${GREEN}   ✅ $(echo "$TENANT_DBS" | wc -l) bases de datos tenant eliminadas${NC}"
+# Contar tenants eliminados
+if [ ! -z "$TENANT_DBS" ]; then
+    TENANT_COUNT=$(echo "$TENANT_DBS" | grep -c '^' 2>/dev/null || echo "0")
+else
+    TENANT_COUNT=0
+fi
+
+echo -e "${GREEN}   ✅ Bases de datos eliminadas${NC}"
+if [ $TENANT_COUNT -gt 0 ]; then
+    echo -e "${GREEN}   ✅ $TENANT_COUNT base(s) de datos tenant eliminadas${NC}"
+else
+    echo -e "${YELLOW}   ℹ️  No se encontraron bases de datos tenant${NC}"
+fi
 echo -e "${GREEN}   ✅ Usuario 'aura_admin' eliminado${NC}"
 
 # 3. Eliminar configuraciones de Nginx
