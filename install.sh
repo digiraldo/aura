@@ -294,9 +294,14 @@ server {
     }
     
     location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
+        try_files $uri =404;
         fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param QUERY_STRING $query_string;
+        fastcgi_param REQUEST_METHOD $request_method;
+        fastcgi_param CONTENT_TYPE $content_type;
+        fastcgi_param CONTENT_LENGTH $content_length;
         include fastcgi_params;
     }
     

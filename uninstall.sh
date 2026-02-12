@@ -5,10 +5,11 @@
 # 
 # Este script elimina completamente Aura Platform del servidor:
 # - Bases de datos (aura_master y todos los tenants)
-# - Configuraciones de Nginx
+# - Configuraciones de Nginx (Aura y phpMyAdmin)
 # - Logs
 # - Archivos de sesión
 # - Usuario de base de datos
+# - Opcionalmente: phpMyAdmin y directorio del proyecto
 #
 # ⚠️  ADVERTENCIA: Esta acción es IRREVERSIBLE
 ###############################################################################
@@ -43,9 +44,10 @@ echo ""
 echo -e "${YELLOW}⚠️  Esta acción eliminará:${NC}"
 echo "   - Todas las bases de datos de Aura (aura_master, tenant_*)"
 echo "   - Usuario de base de datos 'aura_admin'"
-echo "   - Configuraciones de Nginx"
+echo "   - Configuraciones de Nginx (Aura y phpMyAdmin)"
 echo "   - Logs de la aplicación"
 echo "   - Archivos de sesión"
+echo "   - Opcionalmente: phpMyAdmin y directorio ~/aura"
 echo ""
 read -p "¿Estás SEGURO de continuar? Escribe 'SI ELIMINAR' para confirmar: " CONFIRM
 
@@ -158,9 +160,21 @@ else
     echo -e "${YELLOW}   ⚠️  Directorio ~/aura conservado${NC}"
 fi
 
-# 7. Reiniciar servicios
+# 7. Desinstalar phpMyAdmin (opcional)
 echo ""
-echo "7️⃣  Reiniciando servicios..."
+read -p "¿Deseas desinstalar phpMyAdmin? (s/n): " UNINSTALL_PHPMYADMIN
+if [ "$UNINSTALL_PHPMYADMIN" = "s" ] || [ "$UNINSTALL_PHPMYADMIN" = "S" ]; then
+    echo "7️⃣  Desinstalando phpMyAdmin..."
+    sudo apt-get remove --purge -y phpmyadmin 2>/dev/null || true
+    sudo apt-get autoremove -y 2>/dev/null || true
+    echo -e "${GREEN}   ✅ phpMyAdmin desinstalado${NC}"
+else
+    echo -e "${YELLOW}   ⚠️  phpMyAdmin conservado${NC}"
+fi
+
+# 8. Reiniciar servicios
+echo ""
+echo "8️⃣  Reiniciando servicios..."
 sudo systemctl start nginx
 sudo systemctl start php8.2-fpm
 echo -e "${GREEN}   ✅ Servicios reiniciados${NC}"
@@ -175,6 +189,9 @@ echo "   - Bases de datos eliminadas"
 echo "   - Usuario MySQL eliminado"
 echo "   - Configuraciones de Nginx eliminadas"
 echo "   - Logs limpiados"
+if [ "$UNINSTALL_PHPMYADMIN" = "s" ] || [ "$UNINSTALL_PHPMYADMIN" = "S" ]; then
+    echo "   - phpMyAdmin desinstalado"
+fi
 if [ "$DELETE_DIR" = "s" ] || [ "$DELETE_DIR" = "S" ]; then
     echo "   - Directorio del proyecto eliminado"
     echo "   - Scripts copiados a ~/install.sh y ~/uninstall.sh"
