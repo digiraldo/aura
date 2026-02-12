@@ -99,7 +99,7 @@ final class Bootstrap
 
         // Configurar sesiones
         ini_set('session.cookie_httponly', '1');
-        ini_set('session.cookie_secure', '1'); // Solo HTTPS
+        ini_set('session.cookie_secure', '0'); // Permitir HTTP (cambiar a 1 en producción con HTTPS)
         ini_set('session.use_strict_mode', '1');
     }
 
