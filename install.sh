@@ -4,6 +4,7 @@
 # AURA PLATFORM - SCRIPT DE INSTALACIÓN AUTOMÁTICA
 # 
 # Este script instala Aura Platform desde cero:
+# - Instala y configura phpMyAdmin
 # - Crea las bases de datos necesarias
 # - Configura el usuario de base de datos
 # - Ejecuta las migraciones
@@ -13,7 +14,7 @@
 # Requisitos previos:
 # - Nginx, PHP 8.2, MariaDB ya instalados
 # - Git instalado
-# - Proyecto clonado en ~/aura
+# - Proyecto clonado en ~/aura (o se clonará automáticamente)
 ###############################################################################
 
 set -e  # Salir si hay errores
@@ -238,11 +239,105 @@ else
 fi
 
 # ============================================================================
-# PASO 5: EJECUTAR INSTALACIÓN DE AURA
+# PASO 5: INSTALAR Y CONFIGURAR phpMyAdmin
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}═══ PASO 5: Instalando base de datos master ═══${NC}"
+echo -e "${CYAN}═══ PASO 5: Instalando phpMyAdmin ═══${NC}"
+echo ""
+
+# Verificar si phpMyAdmin ya está instalado
+if dpkg -l | grep -q phpmyadmin; then
+    echo -e "${YELLOW}⚠️  phpMyAdmin ya está instalado${NC}"
+else
+    echo "🔧 Instalando phpMyAdmin..."
+    
+    # Configurar instalación no interactiva
+    export DEBIAN_FRONTEND=noninteractive
+    
+    # Pre-configurar phpMyAdmin
+    echo "phpmyadmin phpmyadmin/dbconfig-install boolean true" | sudo debconf-set-selections
+    echo "phpmyadmin phpmyadmin/app-password-confirm password Admin1234" | sudo debconf-set-selections
+    echo "phpmyadmin phpmyadmin/mysql/admin-pass password ${MYSQL_ROOT_PASSWORD}" | sudo debconf-set-selections
+    echo "phpmyadmin phpmyadmin/mysql/app-pass password Admin1234" | sudo debconf-set-selections
+    echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect" | sudo debconf-set-selections
+    
+    # Instalar phpMyAdmin
+    sudo apt-get update -qq
+    sudo apt-get install -y phpmyadmin php-mbstring php-zip php-gd php-json php-curl
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ phpMyAdmin instalado${NC}"
+    else
+        echo -e "${RED}❌ ERROR al instalar phpMyAdmin${NC}"
+        exit 1
+    fi
+fi
+
+# Configurar Nginx para phpMyAdmin en puerto 8998
+echo ""
+echo "🔧 Configurando Nginx para phpMyAdmin..."
+
+if [ -f "/etc/nginx/conf.d/phpmyadmin.conf" ]; then
+    echo -e "${YELLOW}⚠️  Configuración de phpMyAdmin ya existe${NC}"
+else
+    sudo tee /etc/nginx/conf.d/phpmyadmin.conf > /dev/null <<'PHPMYADMIN_CONF'
+server {
+    listen 8998;
+    server_name _;
+    
+    root /usr/share/phpmyadmin;
+    index index.php index.html index.htm;
+    
+    location / {
+        try_files $uri $uri/ =404;
+    }
+    
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+    
+    location ~ /\.ht {
+        deny all;
+    }
+    
+    error_log /var/log/nginx/phpmyadmin_error.log;
+    access_log /var/log/nginx/phpmyadmin_access.log;
+}
+PHPMYADMIN_CONF
+    
+    echo -e "${GREEN}✅ Configuración de Nginx para phpMyAdmin creada${NC}"
+fi
+
+# Probar configuración de Nginx
+echo ""
+echo "🔧 Verificando configuración de Nginx..."
+sudo nginx -t
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Configuración de Nginx válida${NC}"
+    sudo systemctl reload nginx
+    echo -e "${GREEN}✅ Nginx recargado${NC}"
+else
+    echo -e "${RED}❌ ERROR en la configuración de Nginx${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}✅ phpMyAdmin instalado y configurado${NC}"
+echo -e "${BLUE}   Acceso: http://${SERVER_IP}:8998/${NC}"
+echo -e "${BLUE}   Usuario: aura_admin${NC}"
+echo -e "${BLUE}   Contraseña: Admin1234${NC}"
+
+# ============================================================================
+# PASO 6: EJECUTAR INSTALACIÓN DE AURA
+# ============================================================================
+
+echo ""
+echo -e "${CYAN}═══ PASO 6: Instalando base de datos master ═══${NC}"
 echo ""
 
 php install.php
@@ -255,11 +350,11 @@ fi
 echo -e "${GREEN}✅ Base de datos master instalada${NC}"
 
 # ============================================================================
-# PASO 6: CORREGIR CONFIGURACIÓN DE SESIONES (HTTP)
+# PASO 7: CORREGIR CONFIGURACIÓN DE SESIONES (HTTP)
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}═══ PASO 6: Configurando sesiones para HTTP ═══${NC}"
+echo -e "${CYAN}═══ PASO 7: Configurando sesiones para HTTP ═══${NC}"
 echo ""
 
 # Cambiar session.cookie_secure de '1' a '0' en Bootstrap.php
@@ -272,11 +367,11 @@ else
 fi
 
 # ============================================================================
-# PASO 7: CREAR TENANT CON USUARIO ADMIN PERSONALIZADO
+# PASO 8: CREAR TENANT CON USUARIO ADMIN PERSONALIZADO
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}═══ PASO 7: Creando tenant '$TENANT_NAME' ═══${NC}"
+echo -e "${CYAN}═══ PASO 8: Creando tenant '$TENANT_NAME' ═══${NC}"
 echo ""
 
 # Crear script PHP temporal para crear el usuario con las credenciales correctas
@@ -380,11 +475,11 @@ fi
 rm /tmp/create_custom_tenant.php
 
 # ============================================================================
-# PASO 8: VERIFICAR USUARIO EN BASE DE DATOS
+# PASO 9: VERIFICAR USUARIO EN BASE DE DATOS
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}═══ PASO 8: Verificando usuario en base de datos ═══${NC}"
+echo -e "${CYAN}═══ PASO 9: Verificando usuario en base de datos ═══${NC}"
 echo ""
 
 # Verificar que el usuario existe y tiene los campos correctos
@@ -399,11 +494,11 @@ else
 fi
 
 # ============================================================================
-# PASO 9: CONFIGURAR NGINX
+# PASO 10: CONFIGURAR NGINX
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}═══ PASO 9: Configurando Nginx ═══${NC}"
+echo -e "${CYAN}═══ PASO 10: Configurando Nginx ═══${NC}"
 echo ""
 
 # Verificar si ya existe configuración
@@ -467,11 +562,11 @@ else
 fi
 
 # ============================================================================
-# PASO 10: CONFIGURAR /etc/hosts en el servidor
+# PASO 11: CONFIGURAR /etc/hosts en el servidor
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}═══ PASO 10: Configurando /etc/hosts ═══${NC}"
+echo -e "${CYAN}═══ PASO 11: Configurando /etc/hosts ═══${NC}"
 echo ""
 
 # Verificar si ya existe la entrada
@@ -487,11 +582,11 @@ else
 fi
 
 # ============================================================================
-# PASO 11: PRUEBA DE AUTENTICACIÓN
+# PASO 12: PRUEBA DE AUTENTICACIÓN
 # ============================================================================
 
 echo ""
-echo -e "${CYAN}═══ PASO 11: Probando autenticación ═══${NC}"
+echo -e "${CYAN}═══ PASO 12: Probando autenticación ═══${NC}"
 echo ""
 
 # Crear script de prueba
@@ -552,6 +647,11 @@ echo "   Tenant: tenant_${TENANT_NAME}"
 echo "   Usuario DB: aura_admin"
 echo "   Contraseña DB: Admin1234"
 echo ""
+echo -e "${BLUE}🛠️  phpMyAdmin:${NC}"
+echo "   URL: http://${SERVER_IP}:8998/"
+echo "   Usuario: aura_admin"
+echo "   Contraseña: Admin1234"
+echo ""
 echo -e "${YELLOW}📝 Próximos pasos:${NC}"
 echo ""
 echo "1. En tu PC Windows, configura el archivo hosts:"
@@ -570,5 +670,89 @@ echo ""
 echo "4. Inicia sesión con las credenciales mostradas arriba"
 echo ""
 echo -e "${GREEN}🎉 ¡Disfruta de Aura Platform!${NC}"
+echo ""
+
+# ============================================================================
+# INSTRUCCIONES DETALLADAS PARA CONFIGURACIÓN DEL CLIENTE
+# ============================================================================
+
+echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${CYAN}  📖 GUÍA PASO A PASO - Configuración en PC Windows       ${NC}"
+echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+echo ""
+
+echo -e "${YELLOW}1️⃣  Configurar archivo hosts (como Administrador)${NC}"
+echo ""
+echo "   a) Abre PowerShell como Administrador:"
+echo "      • Click derecho en el botón 'Inicio'"
+echo "      • Selecciona 'Terminal (Administrador)' o 'Windows PowerShell (Administrador)'"
+echo ""
+echo "   b) Edita el archivo hosts:"
+echo "      notepad C:\\Windows\\System32\\drivers\\etc\\hosts"
+echo ""
+echo "   c) Agrega estas líneas al final del archivo:"
+echo -e "      ${GREEN}${SERVER_IP}    aura.local${NC}"
+echo -e "      ${GREEN}${SERVER_IP}    ${TENANT_NAME}.aura.local${NC}"
+echo ""
+echo "   d) Guarda y cierra el archivo (Ctrl+S, luego cierra Notepad)"
+echo ""
+
+echo -e "${YELLOW}2️⃣  Limpiar caché DNS${NC}"
+echo ""
+echo "   En la misma ventana de PowerShell (Administrador), ejecuta:"
+echo "      ipconfig /flushdns"
+echo ""
+echo "   Deberías ver: 'Se vació correctamente la caché de resolución de DNS.'"
+echo ""
+
+echo -e "${YELLOW}3️⃣  Acceder a la aplicación${NC}"
+echo ""
+echo "   Abre tu navegador (Chrome, Firefox, Edge) y ve a:"
+echo ""
+echo -e "      ${GREEN}http://${TENANT_NAME}.aura.local:7474/${NC}"
+echo ""
+
+echo -e "${YELLOW}4️⃣  Iniciar sesión${NC}"
+echo ""
+echo "   Credenciales:"
+echo -e "   • Usuario: ${BLUE}${ADMIN_USERNAME}${NC}"
+echo -e "   • Contraseña: ${BLUE}${ADMIN_PASSWORD}${NC}"
+echo ""
+
+echo -e "${RED}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${RED}  🛠️  Solución de Problemas                               ${NC}"
+echo -e "${RED}═══════════════════════════════════════════════════════════${NC}"
+echo ""
+
+echo -e "${YELLOW}❌ Error 'No se puede acceder al sitio':${NC}"
+echo "   1. Verifica que guardaste el archivo hosts correctamente"
+echo "   2. Ejecuta 'ipconfig /flushdns' nuevamente"
+echo "   3. Prueba con 'ping ${TENANT_NAME}.aura.local' en CMD"
+echo "      (debería responder ${SERVER_IP})"
+echo ""
+
+echo -e "${YELLOW}❌ Error 502 Bad Gateway:${NC}"
+echo "   1. Verifica Nginx: sudo systemctl status nginx"
+echo "   2. Verifica PHP-FPM: sudo systemctl status php8.2-fpm"
+echo "   3. Revisa logs: sudo tail -50 /var/log/nginx/aura_error.log"
+echo ""
+
+echo -e "${YELLOW}❌ Página de login no aparece:${NC}"
+echo "   1. Verifica logs: sudo tail -f /var/log/nginx/aura_error.log"
+echo "   2. Verifica permisos: ls -la ~/aura/storage/"
+echo ""
+
+echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}  🎯 ¿Qué puedes hacer ahora?                             ${NC}"
+echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
+echo ""
+echo "   Una vez dentro de Aura Platform:"
+echo "   ✅ Explorar el dashboard"
+echo "   ✅ Crear productos"
+echo "   ✅ Registrar ventas"
+echo "   ✅ Administrar usuarios"
+echo "   ✅ Configurar el sistema según tus necesidades"
+echo ""
+echo -e "${GREEN}   ¡Todo está listo para usar! 🚀${NC}"
 echo ""
 sudo rm -rf install.sh

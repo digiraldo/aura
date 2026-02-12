@@ -60,6 +60,9 @@ if (file_exists(ROOT_PATH . '/.env')) {
 
 // Inicializar aplicación
 use Aura\Core\Bootstrap;
+use Aura\Core\Controllers\SalesController;
+use Aura\Core\Models\VentaModel;
+use Aura\Core\Models\StockModel;
 
 try {
     $app = new Bootstrap();
@@ -216,10 +219,6 @@ function handleCrearVenta(Bootstrap $app): void
     }
     
     try {
-        use Aura\Core\Controllers\SalesController;
-        use Aura\Core\Models\VentaModel;
-        use Aura\Core\Models\StockModel;
-        
         $ventaModel = new VentaModel($app->getPdo());
         $stockModel = new StockModel($app->getPdo());
         

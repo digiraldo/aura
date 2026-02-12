@@ -427,7 +427,15 @@ Para preguntas o soporte:
 *Versión del documento: 1.0 | Última actualización: 2 de febrero de 2026*
 
 
+
+
 ```bash
+cd ~/aura
+git pull
+chmod +x uninstall.sh
+./uninstall.sh
+
+
 # Eliminar directorio del proyecto si existe
 cd ~
 rm -rf ~/aura
@@ -442,4 +450,9 @@ mysql -u aura_admin -pAdmin1234 -e "DROP DATABASE IF EXISTS tenant_empresa_demo;
 cd ~
 git clone https://github.com/digiraldo/aura.git
 cd aura
+
+
+
+sudo systemctl restart php8.2-fpm
+sudo systemctl restart nginx
 ```
